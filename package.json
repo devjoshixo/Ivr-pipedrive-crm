@@ -1,0 +1,21 @@
+{
+  "name": "ivrsolutions-pipedrive",
+  "version": "0.1.0",
+  "description": "IVRSolutions CTI integration for Pipedrive CRM (embedded softphone, click-to-dial, screen-pop, call logging, 15-min sync)",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node backend/src/server.js",
+    "dev": "node --watch backend/src/server.js",
+    "migrate": "node backend/src/db/migrate.js",
+    "test": "node --test backend/test/*.test.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "pg": "^8.12.0"
+  }
+}

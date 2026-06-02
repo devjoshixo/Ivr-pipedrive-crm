@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IVRSolutions — Status</title>
+    <style>
+      :root { --brand: #0b5cab; --ok: #2e7d32; --err: #c62828; --border: #d7dbe0; --muted: #5f6b7a; }
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: Inter, system-ui, sans-serif; color: #1b1f24; background: #fff; }
+      .wrap { max-width: 640px; margin: 0 auto; padding: 28px 20px; }
+      h1 { font-size: 20px; margin: 0 0 18px; }
+      .card { border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; margin-bottom: 16px; }
+      .row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; }
+      .label { color: var(--muted); }
+      .value { font-weight: 600; font-family: ui-monospace, Menlo, monospace; text-align: right; }
+      .value.ok { color: var(--ok); }
+      .value.err { color: var(--err); font-family: inherit; font-weight: 500; }
+      button { padding: 10px 16px; border: 0; border-radius: 8px; background: var(--brand); color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; }
+      button:disabled { opacity: 0.6; cursor: default; }
+      .result { margin-top: 12px; font-size: 13px; color: var(--muted); min-height: 18px; }
+      a { color: var(--brand); }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>IVRSolutions — Sync status</h1>
+
+      <div class="card">
+        <div class="row"><span class="label">Last sync</span><span class="value" id="lastSync">…</span></div>
+        <div class="row"><span class="label">Last error</span><span class="value" id="lastError">…</span></div>
+        <div class="row"><span class="label">Cursors</span><span class="value" id="cursors">…</span></div>
+      </div>
+
+      <div class="card">
+        <button id="runBtn" type="button">Run sync now</button>
+        <div class="result" id="runResult"></div>
+      </div>
+
+      <p style="font-size:12px;color:var(--muted)">
+        The sync also runs automatically every 15 minutes. Paste or update your IVR API token
+        on the <a href="settings.html">Settings</a> page.
+      </p>
+    </div>
+
+    <script type="module" src="js/dashboard.js"></script>
+  </body>
+</html>

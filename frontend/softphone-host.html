@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IVRSolutions Softphone</title>
+    <style>
+      html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; background: #fff; }
+      #softphone { border: 0; width: 100%; height: 100%; display: block; }
+    </style>
+  </head>
+  <body>
+    <!--
+      Pipedrive Custom Floating Window host (milestone 3).
+
+      Registered in the Developer Hub as a Custom Floating Window with entry points
+      "Top bar" + "Phone number and Calls tab". Pipedrive loads this iframe with
+      query params: userId, companyId, token (JWT), id (SDK runtime token).
+
+      The host (js/softphone-host.js):
+        1. Initialises the App Extensions SDK (id auto-read from the URL).
+        2. Embeds the shared Browser-Phone softphone below (microphone + autoplay),
+           which carries pipedrive-cti-adapter.js for the postMessage bridge.
+        3. Click-to-dial via Event.VISIBILITY context -> IVR_DIAL to the softphone.
+        4. Inbound -> SHOW_FLOATING_WINDOW + focus mode + screen-pop via /api/cti/lookup.
+
+      OPEN VERIFICATION ITEMS (need the registered app to confirm in-product):
+        - floating-window iframe permission policy for getUserMedia + autoplay;
+        - exact REDIRECT_TO payload to open a single Person record;
+        - exact SET_FOCUS_MODE payload;
+        - the VISIBILITY context field carrying the click-to-dial number.
+      The CDN softphone must also send `CSP: frame-ancestors` allowing *.pipedrive.com.
+    -->
+    <iframe
+      id="softphone"
+      src="https://cdn.founderscart.com/app/ivrsolutions/webrtc/softphone/index.html"
+      allow="microphone; autoplay"
+      title="IVRSolutions Softphone"
+    ></iframe>
+
+    <script type="module" src="js/softphone-host.js"></script>
+  </body>
+</html>

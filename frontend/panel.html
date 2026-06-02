@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IVRSolutions — Call Recordings</title>
+    <style>
+      body { margin: 0; font-family: Inter, system-ui, sans-serif; color: #1b1f24; padding: 14px; }
+      h2 { font-size: 14px; margin: 0 0 12px; }
+      .muted { color: #5f6b7a; font-size: 13px; }
+      .item { border: 1px solid #e3e7ec; border-radius: 8px; padding: 8px 10px; margin-bottom: 10px; }
+      .meta { font-size: 12px; color: #5f6b7a; margin-bottom: 6px; }
+      audio { width: 100%; }
+    </style>
+  </head>
+  <body>
+    <!--
+      Pipedrive Custom Panel (right sidebar on a Person page). Plays recordings for
+      the current contact, fetched from the backend (/api/calls/recent).
+
+      NOTE: the recording host (calls2.ivrsolutions.in) must be reachable and allowed
+      to load <audio> inside the Pipedrive panel iframe — verify CSP media-src in-product,
+      as the Salesforce build had to (CSP Trusted Site with isApplicableToMediaSrc).
+    -->
+    <h2>Call recordings</h2>
+    <div id="calls"><p class="muted">Loading…</p></div>
+
+    <script type="module" src="js/panel.js"></script>
+  </body>
+</html>

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IVRSolutions — Settings</title>
+    <style>
+      :root {
+        --brand: #0b5cab;
+        --ok: #2e7d32;
+        --err: #c62828;
+        --border: #d7dbe0;
+        --muted: #5f6b7a;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        color: #1b1f24;
+        background: #fff;
+      }
+      .wrap { max-width: 560px; margin: 0 auto; padding: 28px 20px; }
+      h1 { font-size: 20px; margin: 0 0 4px; }
+      p.sub { margin: 0 0 24px; color: var(--muted); font-size: 14px; }
+      label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+      .row { display: flex; gap: 8px; }
+      input[type="text"] {
+        flex: 1;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-size: 14px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      input:focus { outline: 2px solid var(--brand); outline-offset: 0; border-color: var(--brand); }
+      button {
+        padding: 10px 16px;
+        border: 0;
+        border-radius: 8px;
+        background: var(--brand);
+        color: #fff;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button.secondary { background: #eef1f5; color: #1b1f24; }
+      button:disabled { opacity: 0.55; cursor: default; }
+      .status { margin-top: 14px; font-size: 14px; display: flex; align-items: center; gap: 8px; min-height: 22px; }
+      .status.ok { color: var(--ok); }
+      .status.err { color: var(--err); }
+      .dot { width: 10px; height: 10px; border-radius: 50%; }
+      .dot.ok { background: var(--ok); }
+      .dot.err { background: var(--err); }
+      .actions { margin-top: 20px; display: flex; gap: 10px; }
+      .hint { margin-top: 18px; font-size: 12px; color: var(--muted); line-height: 1.5; }
+      .spinner {
+        width: 14px; height: 14px; border: 2px solid #cdd4dc; border-top-color: var(--brand);
+        border-radius: 50%; animation: spin 0.7s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>IVRSolutions for Pipedrive</h1>
+      <p class="sub">Paste your IVR API token to connect your telephony account.</p>
+
+      <label for="token">IVR API token</label>
+      <div class="row">
+        <input id="token" type="text" autocomplete="off" spellcheck="false"
+               placeholder="paste your IVR API token" />
+        <button id="validateBtn" type="button">Validate</button>
+      </div>
+
+      <div id="status" class="status" aria-live="polite"></div>
+
+      <div class="actions">
+        <button id="saveBtn" class="secondary" type="button" disabled>Save &amp; Connect</button>
+      </div>
+
+      <p class="hint">
+        The token is validated against the IVR API and stored encrypted on the integration
+        backend. It is never kept in the browser or in the Pipedrive app package.
+      </p>
+    </div>
+
+    <script>
+      // The settings iframe talks ONLY to our backend, which proxies to the IVR API.
+      // BACKEND_BASE can be set by the host; defaults to same-origin.
+      var BACKEND_BASE = window.IVR_BACKEND_BASE || '';
+
+      // Company context: after OAuth the callback redirects here with ?company_id=.
+      // Inside the Pipedrive app the host may instead inject window.IVR_COMPANY_ID.
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var fromUrl = params.get('company_id');
+        if (fromUrl) window.IVR_COMPANY_ID = fromUrl;
+      })();
+
+      var tokenEl = document.getElementById('token');
+      var validateBtn = document.getElementById('validateBtn');
+      var saveBtn = document.getElementById('saveBtn');
+      var statusEl = document.getElementById('status');
+      var lastValidatedToken = null;
+
+      function setStatus(kind, text, busy) {
+        statusEl.className = 'status' + (kind ? ' ' + kind : '');
+        statusEl.innerHTML = '';
+        if (busy) {
+          var s = document.createElement('span');
+          s.className = 'spinner';
+          statusEl.appendChild(s);
+        } else if (kind) {
+          var d = document.createElement('span');
+          d.className = 'dot ' + kind;
+          statusEl.appendChild(d);
+        }
+        var t = document.createElement('span');
+        t.textContent = text;
+        statusEl.appendChild(t);
+      }
+
+      async function postJson(path, body) {
+        var res = await fetch(BACKEND_BASE + path, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        var data = await res.json();
+        return { ok: res.ok, data: data };
+      }
+
+      async function validate() {
+        var token = tokenEl.value.trim();
+        if (!token) {
+          setStatus('err', 'Enter a token first.');
+          return;
+        }
+        validateBtn.disabled = true;
+        saveBtn.disabled = true;
+        setStatus('', 'Validating…', true);
+        try {
+          var r = await postJson('/api/settings/validate-token', { token: token });
+          if (r.ok && r.data.success && r.data.data.valid) {
+            lastValidatedToken = token;
+            setStatus('ok', 'Token is valid.');
+            saveBtn.disabled = false;
+          } else {
+            lastValidatedToken = null;
+            setStatus('err', (r.data && r.data.error) || 'Token was rejected.');
+          }
+        } catch (e) {
+          setStatus('err', 'Could not reach the integration backend.');
+        } finally {
+          validateBtn.disabled = false;
+        }
+      }
+
+      async function save() {
+        var token = tokenEl.value.trim();
+        if (token !== lastValidatedToken) {
+          setStatus('err', 'Validate the current token before saving.');
+          return;
+        }
+        // companyId comes from the Pipedrive OAuth/SDK context (milestone 2).
+        var companyId = window.IVR_COMPANY_ID || '';
+        if (!companyId) {
+          setStatus('err', 'Company context missing — open this page inside Pipedrive.');
+          return;
+        }
+        saveBtn.disabled = true;
+        setStatus('', 'Saving…', true);
+        try {
+          var r = await postJson('/api/settings/save-token', { token: token, companyId: companyId });
+          if (r.ok && r.data.success) {
+            setStatus('ok', 'Connected. Your account is ready.');
+          } else {
+            setStatus('err', (r.data && r.data.error) || 'Could not save the token.');
+            saveBtn.disabled = false;
+          }
+        } catch (e) {
+          setStatus('err', 'Could not reach the integration backend.');
+          saveBtn.disabled = false;
+        }
+      }
+
+      validateBtn.addEventListener('click', validate);
+      saveBtn.addEventListener('click', save);
+      tokenEl.addEventListener('input', function () {
+        saveBtn.disabled = true;
+        if (statusEl.textContent) setStatus('', '');
+      });
+    </script>
+  </body>
+</html>
