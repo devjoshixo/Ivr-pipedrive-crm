@@ -9,7 +9,7 @@
 //   POST /api/mappings            { pdUserId, did, extension }
 
 const express = require('express');
-const { resolveIdentity } = require('../pipedrive/requestAuth');
+const { createApiGuard } = require('../middleware/apiGuard');
 const { lastTen } = require('../phone');
 
 const ok = (data) => ({ success: true, data, error: null });
@@ -24,14 +24,13 @@ const fail = (message) => ({ success: false, data: null, error: message });
  * @param {{getAccessToken: Function}} deps.tokenService
  * @param {{listUsers: Function}} deps.pipedriveClient
  */
-function createTelephonyRouter({ config, installStore, ivrClient, mappingStore, tokenService, pipedriveClient, apiKeyStore }) {
+function createTelephonyRouter({ config, installStore, ivrClient, mappingStore, tokenService, pipedriveClient, apiKeyStore, limiter }) {
   const router = express.Router();
   const jwtSecret = config.pipedrive.jwtSecret || config.pipedrive.clientSecret;
+  // Dual auth (API key / SDK token) + per-company rate limit; sets req.ivrIdentity.
+  router.use(createApiGuard({ jwtSecret, apiKeyStore, limiter }));
 
-  // Dual auth: API key (server-to-server) or SDK token (in-Pipedrive). Throws -> 401.
-  function identify(req) {
-    return resolveIdentity(req, { jwtSecret, apiKeyStore });
-  }
+  const identify = (req) => req.ivrIdentity;
 
   async function ivrToken(companyId) {
     const token = await installStore.getIvrToken(companyId);

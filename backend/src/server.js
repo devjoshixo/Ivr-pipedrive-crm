@@ -27,6 +27,7 @@ const { createSyncRouter } = require('./routes/sync');
 const { createCallsRouter } = require('./routes/calls');
 const { createTelephonyRouter } = require('./routes/telephony');
 const { createApiKeyRouter } = require('./routes/apikey');
+const { createRateLimiter } = require('./middleware/rateLimit');
 
 function buildApp(config) {
   const app = express();
@@ -96,14 +97,16 @@ function buildApp(config) {
       noMatchPolicy: config.noMatchPolicy,
     });
 
+    const limiter = createRateLimiter({ max: config.rateLimitMax, windowMs: config.rateLimitWindowMs });
+
     app.use('/oauth', createOAuthRouter({ config, oauthClient, pipedriveClient, installStore }));
-    app.use('/api/cti', createCtiRouter({ config, tokenService, personsClient, apiKeyStore }));
-    app.use('/api/sync', createSyncRouter({ config, syncRunner, syncStore, apiKeyStore }));
-    app.use('/api/calls', createCallsRouter({ config, tokenService, callLogsClient, syncStore, apiKeyStore }));
+    app.use('/api/cti', createCtiRouter({ config, tokenService, personsClient, apiKeyStore, limiter }));
+    app.use('/api/sync', createSyncRouter({ config, syncRunner, syncStore, apiKeyStore, limiter }));
+    app.use('/api/calls', createCallsRouter({ config, tokenService, callLogsClient, syncStore, apiKeyStore, limiter }));
     app.use('/api/apikey', createApiKeyRouter({ config, apiKeyStore }));
     app.use(
       '/api',
-      createTelephonyRouter({ config, installStore, ivrClient, mappingStore, tokenService, pipedriveClient, apiKeyStore })
+      createTelephonyRouter({ config, installStore, ivrClient, mappingStore, tokenService, pipedriveClient, apiKeyStore, limiter })
     );
 
     // Expose the scheduler so start() can begin the polling cadence.

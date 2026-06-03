@@ -8,7 +8,7 @@
 // trusted from the query string.
 
 const express = require('express');
-const { resolveIdentity } = require('../pipedrive/requestAuth');
+const { createApiGuard } = require('../middleware/apiGuard');
 
 const ok = (data) => ({ success: true, data, error: null });
 const fail = (message) => ({ success: false, data: null, error: message });
@@ -19,22 +19,19 @@ const fail = (message) => ({ success: false, data: null, error: message });
  * @param {{getAccessToken: Function}} deps.tokenService
  * @param {{searchPersonByPhone: Function}} deps.personsClient
  * @param {{resolveCompany: Function}} [deps.apiKeyStore]
+ * @param {{take: Function}} [deps.limiter]
  */
-function createCtiRouter({ config, tokenService, personsClient, apiKeyStore }) {
+function createCtiRouter({ config, tokenService, personsClient, apiKeyStore, limiter }) {
   const router = express.Router();
   const jwtSecret = config.pipedrive.jwtSecret || config.pipedrive.clientSecret;
+  router.use(createApiGuard({ jwtSecret, apiKeyStore, limiter }));
 
   router.get('/lookup', async (req, res) => {
     const number = String(req.query.number || '').trim();
     if (!number) {
       return res.status(400).json(fail('number is required'));
     }
-    let companyId;
-    try {
-      ({ companyId } = await resolveIdentity(req, { jwtSecret, apiKeyStore }));
-    } catch {
-      return res.status(401).json(fail('Unauthorized'));
-    }
+    const { companyId } = req.ivrIdentity;
     try {
       const { accessToken, apiDomain } = await tokenService.getAccessToken(companyId);
       const match = await personsClient.searchPersonByPhone(apiDomain, accessToken, number);

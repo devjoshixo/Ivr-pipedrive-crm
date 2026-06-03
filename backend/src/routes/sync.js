@@ -7,7 +7,7 @@
 // Authenticated with the App Extensions SDK signed JWT; company from the claims.
 
 const express = require('express');
-const { resolveIdentity } = require('../pipedrive/requestAuth');
+const { createApiGuard } = require('../middleware/apiGuard');
 
 const ok = (data) => ({ success: true, data, error: null });
 const fail = (message) => ({ success: false, data: null, error: message });
@@ -18,21 +18,15 @@ const fail = (message) => ({ success: false, data: null, error: message });
  * @param {{runForCompany: Function}} deps.syncRunner
  * @param {{getSyncState: Function}} deps.syncStore
  * @param {{resolveCompany: Function}} [deps.apiKeyStore]
+ * @param {{take: Function}} [deps.limiter]
  */
-function createSyncRouter({ config, syncRunner, syncStore, apiKeyStore }) {
+function createSyncRouter({ config, syncRunner, syncStore, apiKeyStore, limiter }) {
   const router = express.Router();
   const jwtSecret = config.pipedrive.jwtSecret || config.pipedrive.clientSecret;
-
-  const companyFromRequest = (req) =>
-    resolveIdentity(req, { jwtSecret, apiKeyStore }).then((id) => id.companyId);
+  router.use(createApiGuard({ jwtSecret, apiKeyStore, limiter }));
 
   router.get('/status', async (req, res) => {
-    let companyId;
-    try {
-      companyId = await companyFromRequest(req);
-    } catch {
-      return res.status(401).json(fail('Unauthorized'));
-    }
+    const { companyId } = req.ivrIdentity;
     try {
       const [state, stats] = await Promise.all([
         syncStore.getSyncState(companyId),
@@ -58,12 +52,7 @@ function createSyncRouter({ config, syncRunner, syncStore, apiKeyStore }) {
   });
 
   router.post('/run', async (req, res) => {
-    let companyId;
-    try {
-      companyId = await companyFromRequest(req);
-    } catch {
-      return res.status(401).json(fail('Unauthorized'));
-    }
+    const { companyId } = req.ivrIdentity;
     try {
       const summary = await syncRunner.runForCompany(companyId);
       return res.json(ok(summary));

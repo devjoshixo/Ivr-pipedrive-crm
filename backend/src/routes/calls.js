@@ -9,7 +9,7 @@
 // it (attaches the recording) instead of creating a duplicate.
 
 const express = require('express');
-const { resolveIdentity } = require('../pipedrive/requestAuth');
+const { createApiGuard } = require('../middleware/apiGuard');
 const { buildCallLogPayload } = require('../sync/callLogPayload');
 
 const ok = (data) => ({ success: true, data, error: null });
@@ -22,22 +22,16 @@ const fail = (message) => ({ success: false, data: null, error: message });
  * @param {{createCallLog: Function}} deps.callLogsClient
  * @param {{markSeen: Function, recentForPerson: Function}} deps.syncStore
  * @param {{resolveCompany: Function}} [deps.apiKeyStore]
+ * @param {{take: Function}} [deps.limiter]
  */
-function createCallsRouter({ config, tokenService, callLogsClient, syncStore, apiKeyStore }) {
+function createCallsRouter({ config, tokenService, callLogsClient, syncStore, apiKeyStore, limiter }) {
   const router = express.Router();
   const jwtSecret = config.pipedrive.jwtSecret || config.pipedrive.clientSecret;
-
-  const companyFromRequest = (req) =>
-    resolveIdentity(req, { jwtSecret, apiKeyStore }).then((id) => id.companyId);
+  router.use(createApiGuard({ jwtSecret, apiKeyStore, limiter }));
 
   // Real-time: log a call as soon as it ends (recording is attached later by the sync).
   router.post('/', async (req, res) => {
-    let companyId;
-    try {
-      companyId = await companyFromRequest(req);
-    } catch {
-      return res.status(401).json(fail('Unauthorized'));
-    }
+    const { companyId } = req.ivrIdentity;
     const b = req.body || {};
     const sipCallId = typeof b.sipCallId === 'string' ? b.sipCallId.trim() : '';
     if (!sipCallId) {
@@ -79,12 +73,7 @@ function createCallsRouter({ config, tokenService, callLogsClient, syncStore, ap
 
   // Recordings for a person — powers the panel's audio player.
   router.get('/recent', async (req, res) => {
-    let companyId;
-    try {
-      companyId = await companyFromRequest(req);
-    } catch {
-      return res.status(401).json(fail('Unauthorized'));
-    }
+    const { companyId } = req.ivrIdentity;
     const personId = String(req.query.personId || '').trim();
     if (!personId) {
       return res.status(400).json(fail('personId is required'));

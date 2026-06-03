@@ -51,6 +51,10 @@ function loadConfig() {
     // are cheap (no Pipedrive cost); a 10s hard floor avoids hammering the IVR API.
     syncIntervalMs: Math.max(10000, Number(optional('SYNC_INTERVAL_MS', '30000')) || 30000),
 
+    // Per-company rate limit on the team-facing API endpoints.
+    rateLimitMax: Number(optional('RATE_LIMIT_MAX', '120')) || 120,
+    rateLimitWindowMs: Number(optional('RATE_LIMIT_WINDOW_MS', '60000')) || 60000,
+
     // Pipedrive OAuth
     pipedrive: Object.freeze({
       clientId: optional('PIPEDRIVE_CLIENT_ID', ''),
