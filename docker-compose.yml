@@ -1,0 +1,35 @@
+# Local / single-host deployment: Postgres + the integration backend.
+# Secrets come from .env (copy .env.example -> .env); DATABASE_URL is overridden
+# here to point at the compose Postgres service.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ivr_pipedrive
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d ivr_pipedrive"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://user:password@postgres:5432/ivr_pipedrive
+      PORT: "3000"
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Apply the schema, then start the server.
+    command: sh -c "node backend/src/db/migrate.js && node backend/src/server.js"
+
+volumes:
+  pgdata:
