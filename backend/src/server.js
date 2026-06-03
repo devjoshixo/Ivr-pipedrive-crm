@@ -18,6 +18,7 @@ const { createRecordingsClient } = require('./pipedrive/recordings');
 const { createTokenService } = require('./pipedrive/tokenService');
 const { createSyncRunner } = require('./sync/runSync');
 const { createScheduler } = require('./sync/scheduler');
+const { createRetryingFetch } = require('./util/fetchRetry');
 const { createHealthRouter } = require('./routes/health');
 const { createSettingsRouter } = require('./routes/settings');
 const { createOAuthRouter } = require('./routes/oauth');
@@ -65,11 +66,13 @@ function buildApp(config) {
       clientId: config.pipedrive.clientId,
       clientSecret: config.pipedrive.clientSecret,
     });
-    const pipedriveClient = createPipedriveClient();
-    const personsClient = createPersonsClient();
-    const leadsClient = createLeadsClient();
-    const callLogsClient = createCallLogsClient();
-    const recordingsClient = createRecordingsClient();
+    // All Pipedrive calls go through a fetch that retries 429/5xx with backoff.
+    const pdFetch = createRetryingFetch();
+    const pipedriveClient = createPipedriveClient({ fetchImpl: pdFetch });
+    const personsClient = createPersonsClient({ fetchImpl: pdFetch });
+    const leadsClient = createLeadsClient({ fetchImpl: pdFetch });
+    const callLogsClient = createCallLogsClient({ fetchImpl: pdFetch });
+    const recordingsClient = createRecordingsClient({ fetchImpl: pdFetch });
     const tokenService = createTokenService({ installStore, oauthClient });
     const syncRunner = createSyncRunner({
       ivrClient,

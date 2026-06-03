@@ -56,11 +56,16 @@ function harness({
   noMatchPolicy = 'lead',
   downloadOk = true,
   attachOk = true,
+  failCallIds = [],
 } = {}) {
   const ivrClient = { fetchAllCallLogs: async () => resp };
   const created = [];
+  const failSet = new Set(failCallIds);
   const callLogsClient = {
     createCallLog: async (apiDomain, token, payload) => {
+      // Fail by the PBX Call Id embedded in the note (so tests can target a record).
+      const m = /PBX Call Id: ([^<]+)/.exec(payload.note || '');
+      if (m && failSet.has(m[1].trim())) throw new Error('Pipedrive callLogs create returned 429');
       created.push(payload);
       return { id: `cl-${created.length}` };
     },
@@ -152,6 +157,28 @@ test('advances each cursor to the newest record id (API is newest-first)', async
   assert.equal(syncStore.state.savedCursors.lastCallLogId, '105');
   assert.equal(syncStore.state.savedCursors.lastC2cLogId, '60');
   assert.equal(syncStore.state.savedCursors.lastDialerLogId, ''); // unchanged when empty
+});
+
+test('does NOT advance a category cursor when one of its records fails', async () => {
+  const { runner, syncStore } = harness({
+    resp: {
+      // call_logs: record '5' fails, '4' ok → cursor must stay (re-pull next run)
+      call_logs: [
+        { recordid: '5', call_type: 'incoming', client_no: 'a', call_time: '2026-06-02T10:00:00Z' },
+        { recordid: '4', call_type: 'incoming', client_no: 'b', call_time: '2026-06-02T09:00:00Z' },
+      ],
+      // click_to_call: all ok → cursor advances normally
+      click_to_call_logs: [{ recordid: '60', client_no: 'c', call_time: '2026-06-02T10:00:00Z' }],
+      dialer_logs: [],
+    },
+    match: { personId: 1 }, // matched so no person/lead creation noise
+    failCallIds: ['5'],
+  });
+  const summary = await runner.runForCompany('c1');
+
+  assert.equal(summary.failed, 1);
+  assert.equal(syncStore.state.savedCursors.lastCallLogId, '', 'call_logs cursor held due to failure');
+  assert.equal(syncStore.state.savedCursors.lastC2cLogId, '60', 'click_to_call cursor advanced (no failures)');
 });
 
 test('records a saturation warning when a category returns the 20-record cap', async () => {

@@ -116,6 +116,7 @@ function createSyncRunner({
     const { accessToken, apiDomain } = await tokenService.getAccessToken(companyId);
 
     const matchCache = new Map();
+    const failedCategories = new Set(); // categories that had >=1 failure → don't advance cursor
     let created = 0;
     let reconciled = 0;
     let skipped = 0;
@@ -177,16 +178,21 @@ function createSyncRunner({
         created += 1;
       } catch (err) {
         failed += 1;
+        failedCategories.add(call.source);
         // eslint-disable-next-line no-console
         console.error(`Failed to sync call ${call.callId}:`, err.message);
       }
     }
 
-    // Advance cursors only for categories that returned records (keep prior otherwise).
+    // Advance a category's cursor only when it returned records AND had no failures.
+    // A category with a failed record keeps its old cursor so the page is re-pulled
+    // next run (already-created records are deduped via synced_calls).
+    const advance = (category, raw, prior) =>
+      failedCategories.has(category) ? prior : newestRecordId(raw) || prior;
     await syncStore.saveCursors(companyId, {
-      lastCallLogId: newestRecordId(resp.call_logs) || cursors.lastCallLogId,
-      lastC2cLogId: newestRecordId(resp.click_to_call_logs) || cursors.lastC2cLogId,
-      lastDialerLogId: newestRecordId(resp.dialer_logs) || cursors.lastDialerLogId,
+      lastCallLogId: advance('call_logs', resp.call_logs, cursors.lastCallLogId),
+      lastC2cLogId: advance('click_to_call', resp.click_to_call_logs, cursors.lastC2cLogId),
+      lastDialerLogId: advance('dialer', resp.dialer_logs, cursors.lastDialerLogId),
     });
 
     const saturated = Object.entries(counts)
