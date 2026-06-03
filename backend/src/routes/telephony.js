@@ -9,11 +9,27 @@
 //   POST /api/mappings            { pdUserId, did, extension }
 
 const express = require('express');
+const { z } = require('zod');
 const { createApiGuard } = require('../middleware/apiGuard');
+const { validateBody } = require('../middleware/validate');
 const { lastTen } = require('../phone');
 
 const ok = (data) => ({ success: true, data, error: null });
 const fail = (message) => ({ success: false, data: null, error: message });
+
+const idLike = z.union([z.string(), z.number()]);
+const clickToCallSchema = z.object({
+  phone: z.string().min(1, 'is required'),
+  did: z.string().optional(),
+  extNo: z.string().optional(),
+  extension: z.string().optional(),
+  pdUserId: idLike.optional(),
+});
+const mappingSchema = z.object({
+  pdUserId: idLike,
+  did: z.string().nullable().optional(),
+  extension: z.string().nullable().optional(),
+});
 
 /**
  * @param {object} deps
@@ -39,15 +55,9 @@ function createTelephonyRouter({ config, installStore, ivrClient, mappingStore, 
   }
 
   // Click-to-call: ring the agent's endpoints (softphone + cell) then bridge the customer.
-  router.post('/ivr/click-to-call', async (req, res) => {
-    let id;
-    try {
-      id = await identify(req);
-    } catch {
-      return res.status(401).json(fail('Unauthorized'));
-    }
-    const phone = String(req.body?.phone || '').trim();
-    if (!phone) return res.status(400).json(fail('phone is required'));
+  router.post('/ivr/click-to-call', validateBody(clickToCallSchema), async (req, res) => {
+    const id = identify(req);
+    const phone = String(req.body.phone).trim();
 
     // DID/extension: explicit overrides, else the mapping for the SDK user (or a
     // pdUserId the API-key caller specifies, since key auth has no user context).
@@ -159,15 +169,9 @@ function createTelephonyRouter({ config, installStore, ivrClient, mappingStore, 
     }
   });
 
-  router.post('/mappings', async (req, res) => {
-    let id;
-    try {
-      id = await identify(req);
-    } catch {
-      return res.status(401).json(fail('Unauthorized'));
-    }
-    const pdUserId = String(req.body?.pdUserId || '').trim();
-    if (!pdUserId) return res.status(400).json(fail('pdUserId is required'));
+  router.post('/mappings', validateBody(mappingSchema), async (req, res) => {
+    const id = identify(req);
+    const pdUserId = String(req.body.pdUserId).trim();
     try {
       await mappingStore.saveMapping(id.companyId, {
         pdUserId,

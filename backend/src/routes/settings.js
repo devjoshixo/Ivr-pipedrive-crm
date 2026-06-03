@@ -7,11 +7,19 @@
 // token is validated/stored server-side and never exposed in iframe code.
 
 const express = require('express');
+const { z } = require('zod');
 const { verifySignedToken } = require('../pipedrive/jwt');
+const { validateBody } = require('../middleware/validate');
 
 // Consistent API envelope (see common/patterns.md).
 const ok = (data) => ({ success: true, data, error: null });
 const fail = (message) => ({ success: false, data: null, error: message });
+
+const validateTokenSchema = z.object({ token: z.string().trim().min(1, 'is required') });
+const saveTokenSchema = z.object({
+  token: z.string().trim().min(1, 'is required'),
+  companyId: z.string().optional(),
+});
 
 /**
  * @param {object} deps
@@ -42,11 +50,8 @@ function createSettingsRouter({ ivrClient, installStore, config }) {
   }
 
   // POST /api/settings/validate-token  { token }
-  router.post('/validate-token', async (req, res) => {
-    const token = typeof req.body?.token === 'string' ? req.body.token.trim() : '';
-    if (!token) {
-      return res.status(400).json(fail('Token is required'));
-    }
+  router.post('/validate-token', validateBody(validateTokenSchema), async (req, res) => {
+    const token = req.body.token;
     try {
       const valid = await ivrClient.validateToken(token);
       return res.json(ok({ valid }));
@@ -57,12 +62,9 @@ function createSettingsRouter({ ivrClient, installStore, config }) {
 
   // POST /api/settings/save-token  { token }  (company from SDK token or body fallback)
   // Validates first, then persists sealed. Requires the DB store to be wired.
-  router.post('/save-token', async (req, res) => {
-    const token = typeof req.body?.token === 'string' ? req.body.token.trim() : '';
+  router.post('/save-token', validateBody(saveTokenSchema), async (req, res) => {
+    const token = req.body.token;
     const companyId = resolveCompanyId(req);
-    if (!token) {
-      return res.status(400).json(fail('token is required'));
-    }
     if (!companyId) {
       return res.status(401).json(fail('Could not resolve the company (open inside Pipedrive)'));
     }

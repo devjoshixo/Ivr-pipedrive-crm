@@ -9,8 +9,22 @@
 // it (attaches the recording) instead of creating a duplicate.
 
 const express = require('express');
+const { z } = require('zod');
 const { createApiGuard } = require('../middleware/apiGuard');
+const { validateBody } = require('../middleware/validate');
 const { buildCallLogPayload } = require('../sync/callLogPayload');
+
+const callBodySchema = z.object({
+  sipCallId: z.string().min(1, 'is required'),
+  number: z.string().optional(),
+  direction: z.enum(['inbound', 'outbound']).optional(),
+  durationSec: z.coerce.number().nonnegative().optional(),
+  startTime: z.string().optional(),
+  agentExt: z.string().optional(),
+  didNo: z.string().optional(),
+  personId: z.coerce.number().int().positive().optional(),
+  orgId: z.coerce.number().int().positive().optional(),
+});
 
 const ok = (data) => ({ success: true, data, error: null });
 const fail = (message) => ({ success: false, data: null, error: message });
@@ -30,13 +44,10 @@ function createCallsRouter({ config, tokenService, callLogsClient, syncStore, ap
   router.use(createApiGuard({ jwtSecret, apiKeyStore, limiter }));
 
   // Real-time: log a call as soon as it ends (recording is attached later by the sync).
-  router.post('/', async (req, res) => {
+  router.post('/', validateBody(callBodySchema), async (req, res) => {
     const { companyId } = req.ivrIdentity;
-    const b = req.body || {};
-    const sipCallId = typeof b.sipCallId === 'string' ? b.sipCallId.trim() : '';
-    if (!sipCallId) {
-      return res.status(400).json(fail('sipCallId is required'));
-    }
+    const b = req.body;
+    const sipCallId = String(b.sipCallId).trim();
     try {
       const { accessToken, apiDomain } = await tokenService.getAccessToken(companyId);
       const call = {
