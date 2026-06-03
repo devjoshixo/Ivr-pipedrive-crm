@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IVRSolutions — DID / Extension Mapping</title>
+    <style>
+      :root { --brand: #0b5cab; --ok: #2e7d32; --err: #c62828; --border: #d7dbe0; --muted: #5f6b7a; }
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: Inter, system-ui, sans-serif; color: #1b1f24; background: #fff; }
+      .wrap { max-width: 760px; margin: 0 auto; padding: 24px 20px; }
+      h1 { font-size: 19px; margin: 0 0 4px; }
+      p.sub { margin: 0 0 18px; color: var(--muted); font-size: 13px; }
+      table { width: 100%; border-collapse: collapse; font-size: 14px; }
+      th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+      th { font-size: 12px; color: var(--muted); font-weight: 600; }
+      select { padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; max-width: 200px; }
+      button { padding: 6px 12px; border: 0; border-radius: 6px; background: var(--brand); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
+      button:disabled { opacity: 0.6; cursor: default; }
+      .note { margin-left: 8px; font-size: 12px; color: var(--muted); }
+      .note.ok { color: var(--ok); }
+      .note.err { color: var(--err); }
+      .muted { color: var(--muted); }
+      .err { color: var(--err); }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>DID / Extension mapping</h1>
+      <p class="sub">
+        Assign each Pipedrive user their DID and extension. This routes click-to-call
+        (which extension to ring) and attributes synced calls to the right user.
+      </p>
+      <table>
+        <thead>
+          <tr><th>Pipedrive user</th><th>DID</th><th>Extension</th><th></th></tr>
+        </thead>
+        <tbody id="rows">
+          <tr><td colspan="4" class="muted">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <script type="module" src="js/mappings.js"></script>
+  </body>
+</html>
