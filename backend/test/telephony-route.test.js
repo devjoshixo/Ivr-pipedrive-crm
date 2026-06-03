@@ -72,7 +72,8 @@ test('click-to-call resolves the user mapping and triggers c2c with last-10 phon
     const body = await res.json();
     assert.equal(res.status, 200);
     assert.equal(body.data.recordid, 'c2c-123');
-    assert.deepEqual(c2cCalls[0], { did: '+918044475500', extNo: '201', phone: '9910513597' });
+    // DID is normalized to digits (no '+') for c2c_get; phone to last-10.
+    assert.deepEqual(c2cCalls[0], { did: '918044475500', extNo: '201', phone: '9910513597' });
   } finally {
     server.close();
   }

@@ -12,7 +12,7 @@ const express = require('express');
 const { z } = require('zod');
 const { createApiGuard } = require('../middleware/apiGuard');
 const { validateBody } = require('../middleware/validate');
-const { lastTen } = require('../phone');
+const { lastTen, digitsOnly } = require('../phone');
 
 const ok = (data) => ({ success: true, data, error: null });
 const fail = (message) => ({ success: false, data: null, error: message });
@@ -76,7 +76,12 @@ function createTelephonyRouter({ config, installStore, ivrClient, mappingStore, 
     }
     try {
       const token = await ivrToken(id.companyId);
-      const result = await ivrClient.triggerClickToCall(token, { did, extNo: ext, phone: lastTen(phone) });
+      // c2c_get wants the DID as digits with country code, no '+' (e.g. 918044475500).
+      const result = await ivrClient.triggerClickToCall(token, {
+        did: digitsOnly(did),
+        extNo: ext,
+        phone: lastTen(phone),
+      });
       if (result && result.status && Number(result.status) !== 200) {
         return res.status(502).json(fail(result.message || 'Click-to-call was rejected'));
       }
