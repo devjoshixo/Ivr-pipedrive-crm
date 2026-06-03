@@ -26,8 +26,30 @@ function escapeHtml(s) {
  */
 function createOAuthRouter({ config, oauthClient, pipedriveClient, installStore }) {
   const router = express.Router();
-  const { clientId, redirectUri } = config.pipedrive;
+  const { clientId, clientSecret, redirectUri } = config.pipedrive;
   const stateSecret = config.oauthStateSecret;
+
+  // App uninstall: Pipedrive sends a DELETE to the callback URL with HTTP Basic auth
+  // (client_id:client_secret) and a body { company_id, ... }. We verify and purge the
+  // company's data (tokens, cursors, calls, mappings, API key — all cascade).
+  router.delete('/callback', async (req, res) => {
+    const expected = 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+    if ((req.headers.authorization || '') !== expected) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    const companyId = String((req.body && (req.body.company_id ?? req.body.companyId)) || '');
+    if (companyId) {
+      try {
+        await installStore.deleteCompany(companyId);
+        // eslint-disable-next-line no-console
+        console.log(`Uninstalled + purged company ${companyId}`);
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('Uninstall cleanup failed:', err.message);
+      }
+    }
+    return res.status(200).json({ success: true });
+  });
 
   // Start the flow.
   router.get('/install', (req, res) => {

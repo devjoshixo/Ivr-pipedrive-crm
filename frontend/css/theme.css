@@ -1,0 +1,24 @@
+/* Dark-theme overrides for the Pipedrive Custom UI pages. Applied when Pipedrive
+   loads the iframe with ?theme=dark (and via USER_SETTINGS_CHANGE). Attribute-selector
+   specificity beats the pages' base rules, so this layers on top of each page's style. */
+[data-theme="dark"] body { background: #1f2630; color: #e8ebee; }
+[data-theme="dark"] .card { background: #283039; border-color: #39424d; }
+[data-theme="dark"] input,
+[data-theme="dark"] input[type="text"],
+[data-theme="dark"] select { background: #283039; color: #e8ebee; border-color: #39424d; }
+[data-theme="dark"] th,
+[data-theme="dark"] td { border-color: #39424d; }
+[data-theme="dark"] .muted,
+[data-theme="dark"] .sub,
+[data-theme="dark"] .hint,
+[data-theme="dark"] .label,
+[data-theme="dark"] .lbl,
+[data-theme="dark"] .cap,
+[data-theme="dark"] th { color: #9aa6b2; }
+[data-theme="dark"] .value { color: #e8ebee; }
+[data-theme="dark"] button.secondary { background: #39424d; color: #e8ebee; }
+[data-theme="dark"] #sizebar { background: #283039; border-color: #39424d; }
+[data-theme="dark"] #sizebar button { background: #1f2630; color: #e8ebee; border-color: #39424d; }
+[data-theme="dark"] .apikey { background: #283039; border-color: #39424d; }
+[data-theme="dark"] .item,
+[data-theme="dark"] .callrow { border-color: #39424d; }

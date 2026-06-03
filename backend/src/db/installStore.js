@@ -91,6 +91,15 @@ function createInstallStore(pool, tokenEncKey) {
   }
 
   /**
+   * Delete a company and all its data (cascades to sync_state, synced_calls,
+   * user_mappings, company_api_keys via ON DELETE CASCADE). Called on app uninstall.
+   * @param {string} companyId
+   */
+  async function deleteCompany(companyId) {
+    await pool.query('DELETE FROM installs WHERE company_id = $1', [companyId]);
+  }
+
+  /**
    * Company ids that are fully connected (have both an IVR token and Pipedrive
    * OAuth tokens) — the set the scheduler syncs.
    * @returns {Promise<string[]>}
@@ -108,6 +117,7 @@ function createInstallStore(pool, tokenEncKey) {
     getIvrToken,
     savePipedriveTokens,
     getInstall,
+    deleteCompany,
     listConnectedCompanyIds,
   };
 }
