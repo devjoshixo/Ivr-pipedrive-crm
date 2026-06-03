@@ -9,7 +9,7 @@
 // it (attaches the recording) instead of creating a duplicate.
 
 const express = require('express');
-const { verifySignedToken } = require('../pipedrive/jwt');
+const { resolveIdentity } = require('../pipedrive/requestAuth');
 const { buildCallLogPayload } = require('../sync/callLogPayload');
 
 const ok = (data) => ({ success: true, data, error: null });
@@ -21,25 +21,20 @@ const fail = (message) => ({ success: false, data: null, error: message });
  * @param {{getAccessToken: Function}} deps.tokenService
  * @param {{createCallLog: Function}} deps.callLogsClient
  * @param {{markSeen: Function, recentForPerson: Function}} deps.syncStore
+ * @param {{resolveCompany: Function}} [deps.apiKeyStore]
  */
-function createCallsRouter({ config, tokenService, callLogsClient, syncStore }) {
+function createCallsRouter({ config, tokenService, callLogsClient, syncStore, apiKeyStore }) {
   const router = express.Router();
   const jwtSecret = config.pipedrive.jwtSecret || config.pipedrive.clientSecret;
 
-  function companyFromRequest(req) {
-    const auth = req.headers.authorization || '';
-    const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-    const claims = verifySignedToken(token, jwtSecret);
-    const companyId = claims.companyId ?? claims.company_id;
-    if (companyId == null) throw new Error('No company in token');
-    return String(companyId);
-  }
+  const companyFromRequest = (req) =>
+    resolveIdentity(req, { jwtSecret, apiKeyStore }).then((id) => id.companyId);
 
   // Real-time: log a call as soon as it ends (recording is attached later by the sync).
   router.post('/', async (req, res) => {
     let companyId;
     try {
-      companyId = companyFromRequest(req);
+      companyId = await companyFromRequest(req);
     } catch {
       return res.status(401).json(fail('Unauthorized'));
     }
@@ -86,7 +81,7 @@ function createCallsRouter({ config, tokenService, callLogsClient, syncStore }) 
   router.get('/recent', async (req, res) => {
     let companyId;
     try {
-      companyId = companyFromRequest(req);
+      companyId = await companyFromRequest(req);
     } catch {
       return res.status(401).json(fail('Unauthorized'));
     }

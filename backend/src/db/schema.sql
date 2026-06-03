@@ -30,6 +30,16 @@ CREATE TABLE IF NOT EXISTS sync_state (
   last_error_at         TIMESTAMPTZ
 );
 
+-- Per-company API key for server-to-server access (only the hash is stored).
+CREATE TABLE IF NOT EXISTS company_api_keys (
+  company_id            TEXT PRIMARY KEY REFERENCES installs(company_id) ON DELETE CASCADE,
+  key_hash              TEXT NOT NULL,
+  key_prefix            TEXT NOT NULL,
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_used_at          TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS company_api_keys_hash_idx ON company_api_keys (key_hash);
+
 -- DID + extension -> Pipedrive user mapping (click-to-call routing + call ownership).
 CREATE TABLE IF NOT EXISTS user_mappings (
   company_id            TEXT NOT NULL REFERENCES installs(company_id) ON DELETE CASCADE,

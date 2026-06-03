@@ -9,7 +9,7 @@
 //   POST /api/mappings            { pdUserId, did, extension }
 
 const express = require('express');
-const { identityFromRequest } = require('../pipedrive/requestAuth');
+const { resolveIdentity } = require('../pipedrive/requestAuth');
 const { lastTen } = require('../phone');
 
 const ok = (data) => ({ success: true, data, error: null });
@@ -24,12 +24,13 @@ const fail = (message) => ({ success: false, data: null, error: message });
  * @param {{getAccessToken: Function}} deps.tokenService
  * @param {{listUsers: Function}} deps.pipedriveClient
  */
-function createTelephonyRouter({ config, installStore, ivrClient, mappingStore, tokenService, pipedriveClient }) {
+function createTelephonyRouter({ config, installStore, ivrClient, mappingStore, tokenService, pipedriveClient, apiKeyStore }) {
   const router = express.Router();
   const jwtSecret = config.pipedrive.jwtSecret || config.pipedrive.clientSecret;
 
+  // Dual auth: API key (server-to-server) or SDK token (in-Pipedrive). Throws -> 401.
   function identify(req) {
-    return identityFromRequest(req, jwtSecret); // throws -> caught by callers as 401
+    return resolveIdentity(req, { jwtSecret, apiKeyStore });
   }
 
   async function ivrToken(companyId) {
@@ -42,18 +43,20 @@ function createTelephonyRouter({ config, installStore, ivrClient, mappingStore, 
   router.post('/ivr/click-to-call', async (req, res) => {
     let id;
     try {
-      id = identify(req);
+      id = await identify(req);
     } catch {
       return res.status(401).json(fail('Unauthorized'));
     }
     const phone = String(req.body?.phone || '').trim();
     if (!phone) return res.status(400).json(fail('phone is required'));
 
-    // DID/extension: explicit overrides, else the calling user's mapping.
+    // DID/extension: explicit overrides, else the mapping for the SDK user (or a
+    // pdUserId the API-key caller specifies, since key auth has no user context).
     let did = req.body?.did;
     let ext = req.body?.extNo || req.body?.extension;
-    if ((!did || !ext) && id.userId) {
-      const m = await mappingStore.getForUser(id.companyId, id.userId);
+    const mapUserId = id.userId || (req.body && req.body.pdUserId);
+    if ((!did || !ext) && mapUserId) {
+      const m = await mappingStore.getForUser(id.companyId, String(mapUserId));
       if (m) {
         did = did || m.did;
         ext = ext || m.extension;
@@ -79,7 +82,7 @@ function createTelephonyRouter({ config, installStore, ivrClient, mappingStore, 
   router.get('/ivr/dids', async (req, res) => {
     let id;
     try {
-      id = identify(req);
+      id = await identify(req);
     } catch {
       return res.status(401).json(fail('Unauthorized'));
     }
@@ -94,7 +97,7 @@ function createTelephonyRouter({ config, installStore, ivrClient, mappingStore, 
   router.get('/ivr/extensions', async (req, res) => {
     let id;
     try {
-      id = identify(req);
+      id = await identify(req);
     } catch {
       return res.status(401).json(fail('Unauthorized'));
     }
@@ -111,7 +114,7 @@ function createTelephonyRouter({ config, installStore, ivrClient, mappingStore, 
   router.get('/pd/person', async (req, res) => {
     let id;
     try {
-      id = identify(req);
+      id = await identify(req);
     } catch {
       return res.status(401).json(fail('Unauthorized'));
     }
@@ -129,7 +132,7 @@ function createTelephonyRouter({ config, installStore, ivrClient, mappingStore, 
   router.get('/pd/users', async (req, res) => {
     let id;
     try {
-      id = identify(req);
+      id = await identify(req);
     } catch {
       return res.status(401).json(fail('Unauthorized'));
     }
@@ -145,7 +148,7 @@ function createTelephonyRouter({ config, installStore, ivrClient, mappingStore, 
   router.get('/mappings', async (req, res) => {
     let id;
     try {
-      id = identify(req);
+      id = await identify(req);
     } catch {
       return res.status(401).json(fail('Unauthorized'));
     }
@@ -160,7 +163,7 @@ function createTelephonyRouter({ config, installStore, ivrClient, mappingStore, 
   router.post('/mappings', async (req, res) => {
     let id;
     try {
-      id = identify(req);
+      id = await identify(req);
     } catch {
       return res.status(401).json(fail('Unauthorized'));
     }

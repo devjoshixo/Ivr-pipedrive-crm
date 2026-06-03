@@ -24,6 +24,8 @@
       .stat { flex: 1; }
       .stat .num { display: block; font-size: 26px; font-weight: 700; color: var(--brand); }
       .stat .cap { font-size: 12px; color: var(--muted); }
+      .apikey { font-family: ui-monospace, Menlo, monospace; font-size: 13px; background: #f5f7fa; border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; margin: 8px 0; word-break: break-all; }
+      button.secondary { background: #eef1f5; color: #1b1f24; }
     </style>
   </head>
   <body>
@@ -45,6 +47,18 @@
       <div class="card">
         <button id="runBtn" type="button">Run sync now</button>
         <div class="result" id="runResult"></div>
+      </div>
+
+      <div class="card">
+        <div class="row"><span class="label">API key (for server-to-server access)</span></div>
+        <div id="apiKeyBox" class="apikey">…</div>
+        <button id="genKeyBtn" class="secondary" type="button">Generate / Regenerate key</button>
+        <div class="result" id="keyResult"></div>
+        <p style="font-size:12px;color:var(--muted);margin:10px 0 0">
+          Paste this key into the FoundersCart website to let it call this integration's
+          APIs for your account. Shown in full only once — copy it now. Regenerating
+          invalidates the old key.
+        </p>
       </div>
 
       <p style="font-size:12px;color:var(--muted)">

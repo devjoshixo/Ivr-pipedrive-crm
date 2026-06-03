@@ -8,7 +8,7 @@
 // trusted from the query string.
 
 const express = require('express');
-const { verifySignedToken } = require('../pipedrive/jwt');
+const { resolveIdentity } = require('../pipedrive/requestAuth');
 
 const ok = (data) => ({ success: true, data, error: null });
 const fail = (message) => ({ success: false, data: null, error: message });
@@ -18,19 +18,11 @@ const fail = (message) => ({ success: false, data: null, error: message });
  * @param {object} deps.config
  * @param {{getAccessToken: Function}} deps.tokenService
  * @param {{searchPersonByPhone: Function}} deps.personsClient
+ * @param {{resolveCompany: Function}} [deps.apiKeyStore]
  */
-function createCtiRouter({ config, tokenService, personsClient }) {
+function createCtiRouter({ config, tokenService, personsClient, apiKeyStore }) {
   const router = express.Router();
   const jwtSecret = config.pipedrive.jwtSecret || config.pipedrive.clientSecret;
-
-  function companyFromRequest(req) {
-    const auth = req.headers.authorization || '';
-    const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-    const claims = verifySignedToken(token, jwtSecret);
-    const companyId = claims.companyId ?? claims.company_id;
-    if (companyId == null) throw new Error('No company in token');
-    return String(companyId);
-  }
 
   router.get('/lookup', async (req, res) => {
     const number = String(req.query.number || '').trim();
@@ -39,7 +31,7 @@ function createCtiRouter({ config, tokenService, personsClient }) {
     }
     let companyId;
     try {
-      companyId = companyFromRequest(req);
+      ({ companyId } = await resolveIdentity(req, { jwtSecret, apiKeyStore }));
     } catch {
       return res.status(401).json(fail('Unauthorized'));
     }

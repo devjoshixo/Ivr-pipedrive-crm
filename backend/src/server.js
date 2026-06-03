@@ -26,6 +26,7 @@ const { createCtiRouter } = require('./routes/cti');
 const { createSyncRouter } = require('./routes/sync');
 const { createCallsRouter } = require('./routes/calls');
 const { createTelephonyRouter } = require('./routes/telephony');
+const { createApiKeyRouter } = require('./routes/apikey');
 
 function buildApp(config) {
   const app = express();
@@ -44,6 +45,7 @@ function buildApp(config) {
   let installStore;
   let syncStore;
   let mappingStore;
+  let apiKeyStore;
   try {
     // eslint-disable-next-line global-require
     const { getPool } = require('./db/pool');
@@ -53,10 +55,13 @@ function buildApp(config) {
     const { createSyncStore } = require('./db/syncStore');
     // eslint-disable-next-line global-require
     const { createMappingStore } = require('./db/mappingStore');
+    // eslint-disable-next-line global-require
+    const { createApiKeyStore } = require('./db/apiKeyStore');
     const pool = getPool(config.databaseUrl);
     installStore = createInstallStore(pool, config.tokenEncKey);
     syncStore = createSyncStore(pool);
     mappingStore = createMappingStore(pool);
+    apiKeyStore = createApiKeyStore(pool);
   } catch (err) {
     // eslint-disable-next-line no-console
     console.warn('Persistence unavailable (token save + sync disabled):', err.message);
@@ -92,12 +97,13 @@ function buildApp(config) {
     });
 
     app.use('/oauth', createOAuthRouter({ config, oauthClient, pipedriveClient, installStore }));
-    app.use('/api/cti', createCtiRouter({ config, tokenService, personsClient }));
-    app.use('/api/sync', createSyncRouter({ config, syncRunner, syncStore }));
-    app.use('/api/calls', createCallsRouter({ config, tokenService, callLogsClient, syncStore }));
+    app.use('/api/cti', createCtiRouter({ config, tokenService, personsClient, apiKeyStore }));
+    app.use('/api/sync', createSyncRouter({ config, syncRunner, syncStore, apiKeyStore }));
+    app.use('/api/calls', createCallsRouter({ config, tokenService, callLogsClient, syncStore, apiKeyStore }));
+    app.use('/api/apikey', createApiKeyRouter({ config, apiKeyStore }));
     app.use(
       '/api',
-      createTelephonyRouter({ config, installStore, ivrClient, mappingStore, tokenService, pipedriveClient })
+      createTelephonyRouter({ config, installStore, ivrClient, mappingStore, tokenService, pipedriveClient, apiKeyStore })
     );
 
     // Expose the scheduler so start() can begin the polling cadence.

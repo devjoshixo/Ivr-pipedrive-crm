@@ -98,6 +98,39 @@ async function runSync() {
   }
 }
 
+async function loadApiKey() {
+  try {
+    const res = await api('/api/apikey');
+    if (!res.ok) return;
+    const meta = (await res.json()).data.key;
+    $('apiKeyBox').textContent = meta
+      ? `${meta.prefix}…  (created ${fmtTime(meta.createdAt)})`
+      : 'No key yet — click Generate.';
+  } catch {
+    $('apiKeyBox').textContent = 'Could not load key.';
+  }
+}
+
+async function regenerateKey() {
+  const btn = $('genKeyBtn');
+  btn.disabled = true;
+  $('keyResult').textContent = 'Generating…';
+  try {
+    const res = await api('/api/apikey/regenerate', { method: 'POST' });
+    const body = await res.json();
+    if (res.ok) {
+      $('apiKeyBox').textContent = body.data.key; // full key, shown once
+      $('keyResult').textContent = 'Copy this now — it will not be shown again.';
+    } else {
+      $('keyResult').textContent = (body && body.error) || 'Failed';
+    }
+  } catch {
+    $('keyResult').textContent = 'Could not reach the backend';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 async function init() {
   try {
     sdk = await new AppExtensionsSDK().initialize();
@@ -106,7 +139,9 @@ async function init() {
     console.error('SDK init failed:', err && err.message);
   }
   $('runBtn').addEventListener('click', runSync);
+  $('genKeyBtn').addEventListener('click', regenerateKey);
   loadStatus();
+  loadApiKey();
 }
 
 if (document.readyState === 'loading') {

@@ -7,7 +7,7 @@
 // Authenticated with the App Extensions SDK signed JWT; company from the claims.
 
 const express = require('express');
-const { verifySignedToken } = require('../pipedrive/jwt');
+const { resolveIdentity } = require('../pipedrive/requestAuth');
 
 const ok = (data) => ({ success: true, data, error: null });
 const fail = (message) => ({ success: false, data: null, error: message });
@@ -17,24 +17,19 @@ const fail = (message) => ({ success: false, data: null, error: message });
  * @param {object} deps.config
  * @param {{runForCompany: Function}} deps.syncRunner
  * @param {{getSyncState: Function}} deps.syncStore
+ * @param {{resolveCompany: Function}} [deps.apiKeyStore]
  */
-function createSyncRouter({ config, syncRunner, syncStore }) {
+function createSyncRouter({ config, syncRunner, syncStore, apiKeyStore }) {
   const router = express.Router();
   const jwtSecret = config.pipedrive.jwtSecret || config.pipedrive.clientSecret;
 
-  function companyFromRequest(req) {
-    const auth = req.headers.authorization || '';
-    const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-    const claims = verifySignedToken(token, jwtSecret);
-    const companyId = claims.companyId ?? claims.company_id;
-    if (companyId == null) throw new Error('No company in token');
-    return String(companyId);
-  }
+  const companyFromRequest = (req) =>
+    resolveIdentity(req, { jwtSecret, apiKeyStore }).then((id) => id.companyId);
 
   router.get('/status', async (req, res) => {
     let companyId;
     try {
-      companyId = companyFromRequest(req);
+      companyId = await companyFromRequest(req);
     } catch {
       return res.status(401).json(fail('Unauthorized'));
     }
@@ -65,7 +60,7 @@ function createSyncRouter({ config, syncRunner, syncStore }) {
   router.post('/run', async (req, res) => {
     let companyId;
     try {
-      companyId = companyFromRequest(req);
+      companyId = await companyFromRequest(req);
     } catch {
       return res.status(401).json(fail('Unauthorized'));
     }
