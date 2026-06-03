@@ -91,8 +91,12 @@ function buildApp(config) {
     app.use('/api/sync', createSyncRouter({ config, syncRunner, syncStore }));
     app.use('/api/calls', createCallsRouter({ config, tokenService, callLogsClient, syncStore }));
 
-    // Expose the scheduler so start() can begin the 15-minute cadence.
-    app.locals.scheduler = createScheduler({ installStore, syncRunner });
+    // Expose the scheduler so start() can begin the polling cadence.
+    app.locals.scheduler = createScheduler({
+      installStore,
+      syncRunner,
+      intervalMs: config.syncIntervalMs,
+    });
   } else {
     // eslint-disable-next-line no-console
     console.warn('Pipedrive OAuth/CTI/sync not wired (missing client credentials or persistence)');
@@ -114,7 +118,7 @@ function start() {
   if (app.locals.scheduler) {
     app.locals.scheduler.start();
     // eslint-disable-next-line no-console
-    console.log('15-minute call-log sync scheduler started');
+    console.log(`Call-log sync scheduler started (every ${Math.round(config.syncIntervalMs / 1000)}s)`);
   }
 }
 

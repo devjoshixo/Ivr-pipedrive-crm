@@ -47,6 +47,10 @@ function loadConfig() {
     // 'lead' = create Person + Lead (default), 'person' = create Person, 'skip' = don't log.
     noMatchPolicy: optional('NO_MATCH_POLICY', 'lead'),
 
+    // How often the background poller pulls /v1/all_call_logs. Default 30s. Empty polls
+    // are cheap (no Pipedrive cost); a 10s hard floor avoids hammering the IVR API.
+    syncIntervalMs: Math.max(10000, Number(optional('SYNC_INTERVAL_MS', '30000')) || 30000),
+
     // Pipedrive OAuth
     pipedrive: Object.freeze({
       clientId: optional('PIPEDRIVE_CLIENT_ID', ''),

@@ -16,25 +16,34 @@ const DEFAULT_INTERVAL_MS = 15 * 60 * 1000;
  */
 function createScheduler({ installStore, syncRunner, intervalMs = DEFAULT_INTERVAL_MS, logger = console }) {
   let handle = null;
+  let inFlight = false; // prevents overlapping ticks at tight intervals (e.g. 30s)
 
   async function tick() {
-    let ids = [];
+    if (inFlight) {
+      return { ran: 0, total: 0, skipped: true };
+    }
+    inFlight = true;
     try {
-      ids = await installStore.listConnectedCompanyIds();
-    } catch (err) {
-      logger.error('Scheduler could not list companies:', err.message);
-      return { ran: 0, total: 0 };
-    }
-    let ran = 0;
-    for (const id of ids) {
+      let ids = [];
       try {
-        await syncRunner.runForCompany(id);
-        ran += 1;
+        ids = await installStore.listConnectedCompanyIds();
       } catch (err) {
-        logger.error(`Scheduled sync failed for ${id}:`, err.message);
+        logger.error('Scheduler could not list companies:', err.message);
+        return { ran: 0, total: 0 };
       }
+      let ran = 0;
+      for (const id of ids) {
+        try {
+          await syncRunner.runForCompany(id);
+          ran += 1;
+        } catch (err) {
+          logger.error(`Scheduled sync failed for ${id}:`, err.message);
+        }
+      }
+      return { ran, total: ids.length };
+    } finally {
+      inFlight = false;
     }
-    return { ran, total: ids.length };
   }
 
   function start() {
