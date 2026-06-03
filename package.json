@@ -10,7 +10,8 @@
     "start": "node backend/src/server.js",
     "dev": "node --watch backend/src/server.js",
     "migrate": "node backend/src/db/migrate.js",
-    "test": "node --test backend/test/*.test.js"
+    "test": "node --test backend/test/*.test.js",
+    "test:db": "node --test backend/test/db-stores.test.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
