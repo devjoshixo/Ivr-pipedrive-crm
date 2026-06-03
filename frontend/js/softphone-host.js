@@ -138,15 +138,26 @@ window.addEventListener('message', (event) => {
   }
 });
 
+// The softphone needs the full floating-window height or its content is clipped.
+// Window limits are 70–700 high, 200–800 wide; we size near the top of that range.
+const WINDOW_SIZE = { height: 700, width: 400 };
+
 async function init() {
   try {
-    sdk = await new AppExtensionsSDK().initialize();
+    sdk = await new AppExtensionsSDK().initialize({ size: WINDOW_SIZE });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('App Extensions SDK init failed:', err && err.message);
     return;
   }
   refreshSignedToken();
+
+  // Enforce the size after init too (some hosts ignore the initialize size).
+  try {
+    await sdk.execute(Command.RESIZE, { height: WINDOW_SIZE.height, width: WINDOW_SIZE.width });
+  } catch {
+    /* non-fatal */
+  }
 
   // Click-to-dial: VISIBILITY fires when the window is shown from a phone-field click.
   sdk.listen(Event.VISIBILITY, (payload) => {
