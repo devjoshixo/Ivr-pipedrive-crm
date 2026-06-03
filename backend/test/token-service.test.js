@@ -99,6 +99,29 @@ test('refreshes when the token expires within the safety buffer', async () => {
   assert.equal(refreshed, true);
 });
 
+test('forceRefresh refreshes even when the cached token is still valid', async () => {
+  const store = fakeStore({
+    company_id: 'c1',
+    pd_access_token: 'cached',
+    pd_refresh_token: 'rt',
+    pd_api_domain: 'https://acme.pipedrive.com',
+    company_domain: 'acme',
+    pd_token_expires_at: new Date(NOW + 30 * 60 * 1000), // valid for 30 min
+  });
+  let refreshed = false;
+  const oauthClient = {
+    refreshToken: async () => {
+      refreshed = true;
+      return { access_token: 'forced', refresh_token: 'rt2', expires_in: 3600, api_domain: 'https://acme.pipedrive.com' };
+    },
+  };
+  const svc = createTokenService({ installStore: store, oauthClient, now: () => NOW });
+
+  const res = await svc.getAccessToken('c1', { forceRefresh: true });
+  assert.equal(refreshed, true, 'forceRefresh bypasses the still-valid cache');
+  assert.equal(res.accessToken, 'forced');
+});
+
 test('throws when the company is not connected', async () => {
   const store = fakeStore(null);
   const svc = createTokenService({ installStore: store, oauthClient: {}, now: () => NOW });

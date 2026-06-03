@@ -143,6 +143,27 @@ function createSyncStore(pool) {
     return rows[0] || null;
   }
 
+  /** Aggregate counts for the setup dashboard. */
+  async function getStats(companyId) {
+    const { rows } = await pool.query(
+      `SELECT count(*)::int                                          AS total,
+              count(*) FILTER (WHERE source = 'sync')::int           AS via_sync,
+              count(*) FILTER (WHERE source = 'realtime')::int       AS via_realtime,
+              count(DISTINCT pd_person_id)::int                      AS people,
+              count(*) FILTER (WHERE recording_attached)::int        AS with_recording
+       FROM synced_calls WHERE company_id = $1`,
+      [companyId]
+    );
+    const r = rows[0] || {};
+    return {
+      total: r.total || 0,
+      viaSync: r.via_sync || 0,
+      viaRealtime: r.via_realtime || 0,
+      people: r.people || 0,
+      withRecording: r.with_recording || 0,
+    };
+  }
+
   return {
     getCursors,
     saveCursors,
@@ -154,6 +175,7 @@ function createSyncStore(pool) {
     recordError,
     recordSuccess,
     getSyncState,
+    getStats,
   };
 }
 

@@ -54,6 +54,11 @@ function renderStatus(data) {
   }
   const c = data.cursors || {};
   $('cursors').textContent = `calls:${c.lastCallLogId || '-'}  c2c:${c.lastC2cLogId || '-'}  dialer:${c.lastDialerLogId || '-'}`;
+
+  const s = data.stats || {};
+  $('statCalls').textContent = s.total != null ? s.total : '–';
+  $('statPeople').textContent = s.people != null ? s.people : '–';
+  $('statRecordings').textContent = s.withRecording != null ? s.withRecording : '–';
 }
 
 async function loadStatus() {

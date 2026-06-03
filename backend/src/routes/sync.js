@@ -39,7 +39,10 @@ function createSyncRouter({ config, syncRunner, syncStore }) {
       return res.status(401).json(fail('Unauthorized'));
     }
     try {
-      const state = await syncStore.getSyncState(companyId);
+      const [state, stats] = await Promise.all([
+        syncStore.getSyncState(companyId),
+        syncStore.getStats ? syncStore.getStats(companyId) : null,
+      ]);
       return res.json(
         ok({
           lastSyncAt: state ? state.last_sync_at : null,
@@ -51,6 +54,7 @@ function createSyncRouter({ config, syncRunner, syncStore }) {
                 lastDialerLogId: state.last_dialer_log_id,
               }
             : null,
+          stats,
         })
       );
     } catch {

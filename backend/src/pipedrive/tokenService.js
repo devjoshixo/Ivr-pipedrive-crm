@@ -15,9 +15,12 @@ const REFRESH_BUFFER_MS = 60 * 1000; // refresh 60s before actual expiry
 function createTokenService({ installStore, oauthClient, now = Date.now }) {
   /**
    * @param {string} companyId
+   * @param {object} [opts]
+   * @param {boolean} [opts.forceRefresh] - refresh even if the cached token looks valid
+   *   (used to self-heal a token that was revoked before its expiry, e.g. after re-auth)
    * @returns {Promise<{accessToken: string, apiDomain: string}>}
    */
-  async function getAccessToken(companyId) {
+  async function getAccessToken(companyId, { forceRefresh = false } = {}) {
     const install = await installStore.getInstall(companyId);
     if (!install || !install.pd_refresh_token) {
       throw new Error(`Company ${companyId} is not connected to Pipedrive`);
@@ -26,7 +29,8 @@ function createTokenService({ installStore, oauthClient, now = Date.now }) {
     const expiresAtMs = install.pd_token_expires_at
       ? new Date(install.pd_token_expires_at).getTime()
       : 0;
-    const stillValid = install.pd_access_token && expiresAtMs - now() > REFRESH_BUFFER_MS;
+    const stillValid =
+      !forceRefresh && install.pd_access_token && expiresAtMs - now() > REFRESH_BUFFER_MS;
     if (stillValid) {
       return { accessToken: install.pd_access_token, apiDomain: install.pd_api_domain };
     }

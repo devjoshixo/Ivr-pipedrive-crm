@@ -113,10 +113,11 @@ function createSyncRunner({
       companyId,
       calls.map((c) => c.sipCallId)
     );
-    const { accessToken, apiDomain } = await tokenService.getAccessToken(companyId);
+    let { accessToken, apiDomain } = await tokenService.getAccessToken(companyId);
 
     const matchCache = new Map();
     const failedCategories = new Set(); // categories that had >=1 failure → don't advance cursor
+    let refreshedThisRun = false; // self-heal a revoked token at most once per run
     let created = 0;
     let reconciled = 0;
     let skipped = 0;
@@ -177,6 +178,21 @@ function createSyncRunner({
         });
         created += 1;
       } catch (err) {
+        // Self-heal a revoked-but-not-expired access token: refresh once, then let
+        // the failed record retry next run (its category cursor is held below).
+        if (/\b401\b/.test(err.message) && !refreshedThisRun) {
+          refreshedThisRun = true;
+          try {
+            const fresh = await tokenService.getAccessToken(companyId, { forceRefresh: true });
+            accessToken = fresh.accessToken;
+            apiDomain = fresh.apiDomain;
+            // eslint-disable-next-line no-console
+            console.error(`Refreshed token after 401; ${call.callId} retries next run`);
+          } catch (e) {
+            // eslint-disable-next-line no-console
+            console.error('Force-refresh after 401 failed:', e.message);
+          }
+        }
         failed += 1;
         failedCategories.add(call.source);
         // eslint-disable-next-line no-console

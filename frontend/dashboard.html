@@ -20,11 +20,21 @@
       button:disabled { opacity: 0.6; cursor: default; }
       .result { margin-top: 12px; font-size: 13px; color: var(--muted); min-height: 18px; }
       a { color: var(--brand); }
+      .stats { display: flex; gap: 12px; text-align: center; }
+      .stat { flex: 1; }
+      .stat .num { display: block; font-size: 26px; font-weight: 700; color: var(--brand); }
+      .stat .cap { font-size: 12px; color: var(--muted); }
     </style>
   </head>
   <body>
     <div class="wrap">
       <h1>IVRSolutions — Sync status</h1>
+
+      <div class="card stats">
+        <div class="stat"><span class="num" id="statCalls">…</span><span class="cap">Calls logged</span></div>
+        <div class="stat"><span class="num" id="statPeople">…</span><span class="cap">Contacts/Leads</span></div>
+        <div class="stat"><span class="num" id="statRecordings">…</span><span class="cap">Recordings</span></div>
+      </div>
 
       <div class="card">
         <div class="row"><span class="label">Last sync</span><span class="value" id="lastSync">…</span></div>

@@ -57,15 +57,21 @@ function harness({
   downloadOk = true,
   attachOk = true,
   failCallIds = [],
+  unauthorizedCallIds = [],
 } = {}) {
   const ivrClient = { fetchAllCallLogs: async () => resp };
   const created = [];
   const failSet = new Set(failCallIds);
+  const unauthSet = new Set(unauthorizedCallIds);
   const callLogsClient = {
     createCallLog: async (apiDomain, token, payload) => {
       // Fail by the PBX Call Id embedded in the note (so tests can target a record).
       const m = /PBX Call Id: ([^<]+)/.exec(payload.note || '');
-      if (m && failSet.has(m[1].trim())) throw new Error('Pipedrive callLogs create returned 429');
+      const callId = m ? m[1].trim() : '';
+      if (unauthSet.has(callId) && token !== 'AT2') {
+        throw new Error('Pipedrive callLogs create returned 401');
+      }
+      if (failSet.has(callId)) throw new Error('Pipedrive callLogs create returned 429');
       created.push(payload);
       return { id: `cl-${created.length}` };
     },
@@ -98,7 +104,16 @@ function harness({
       return attachOk;
     },
   };
-  const tokenService = { getAccessToken: async () => ({ accessToken: 'AT', apiDomain: 'https://acme.pipedrive.com' }) };
+  const tokenCalls = [];
+  const tokenService = {
+    getAccessToken: async (_companyId, opts = {}) => {
+      tokenCalls.push(Boolean(opts.forceRefresh));
+      return {
+        accessToken: opts.forceRefresh ? 'AT2' : 'AT',
+        apiDomain: 'https://acme.pipedrive.com',
+      };
+    },
+  };
   const installStore = { getIvrToken: async () => 'ivr-token' };
   const syncStore = fakeSyncStore({ seen, realtime });
   const runner = createSyncRunner({
@@ -113,7 +128,7 @@ function harness({
     noMatchPolicy,
     now: Date.parse('2026-06-02T12:00:00Z'),
   });
-  return { runner, created, searchCalls, createdPersons, createdLeads, attachedCalls, syncStore };
+  return { runner, created, searchCalls, createdPersons, createdLeads, attachedCalls, syncStore, tokenCalls };
 }
 
 test('creates a call log for each new record and marks them seen', async () => {
@@ -157,6 +172,23 @@ test('advances each cursor to the newest record id (API is newest-first)', async
   assert.equal(syncStore.state.savedCursors.lastCallLogId, '105');
   assert.equal(syncStore.state.savedCursors.lastC2cLogId, '60');
   assert.equal(syncStore.state.savedCursors.lastDialerLogId, ''); // unchanged when empty
+});
+
+test('force-refreshes the token once on a 401 (self-heal)', async () => {
+  const { runner, tokenCalls, syncStore } = harness({
+    resp: {
+      call_logs: [{ recordid: '7', call_type: 'incoming', client_no: 'a', call_time: '2026-06-02T10:00:00Z' }],
+      click_to_call_logs: [],
+      dialer_logs: [],
+    },
+    match: { personId: 1 },
+    unauthorizedCallIds: ['7'],
+  });
+  const summary = await runner.runForCompany('c1');
+
+  assert.deepEqual(tokenCalls, [false, true], 'normal fetch then one forced refresh');
+  assert.equal(summary.failed, 1, 'the 401 record is left for next run');
+  assert.equal(syncStore.state.savedCursors.lastCallLogId, '', 'cursor held so it retries with the fresh token');
 });
 
 test('does NOT advance a category cursor when one of its records fails', async () => {
