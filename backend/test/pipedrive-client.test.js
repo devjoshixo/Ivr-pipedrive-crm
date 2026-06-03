@@ -40,6 +40,21 @@ test('getCurrentUser calls api_domain/api/v1/users/me with Bearer and unwraps th
   });
 });
 
+test('listUsers maps id/name/email/active from /api/v1/users', async () => {
+  const { fetchImpl, calls } = fakeFetch({
+    success: true,
+    data: [
+      { id: 1, name: 'Agent One', email: 'a@x.com', active_flag: true },
+      { id: 2, name: 'Agent Two', email: 'b@x.com', active_flag: false },
+    ],
+  });
+  const client = createPipedriveClient({ fetchImpl });
+  const users = await client.listUsers('https://acme.pipedrive.com', 'tok');
+  assert.equal(calls[0].url, 'https://acme.pipedrive.com/api/v1/users');
+  assert.deepEqual(users[0], { id: 1, name: 'Agent One', email: 'a@x.com', active: true });
+  assert.equal(users[1].active, false);
+});
+
 test('getCurrentUser throws on non-2xx', async () => {
   const { fetchImpl } = fakeFetch({ success: false }, { ok: false, status: 401 });
   const client = createPipedriveClient({ fetchImpl });

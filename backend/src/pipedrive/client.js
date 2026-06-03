@@ -39,7 +39,17 @@ function createPipedriveClient({ fetchImpl = globalThis.fetch } = {}) {
     };
   }
 
-  return { getCurrentUser };
+  /**
+   * GET /api/v1/users — list the company's users (for the DID/extension mapping page).
+   * @returns {Promise<Array<{id, name, email, active}>>}
+   */
+  async function listUsers(apiDomain, accessToken) {
+    const body = await get(apiDomain, accessToken, '/api/v1/users');
+    const arr = (body && body.data) || [];
+    return arr.map((u) => ({ id: u.id, name: u.name, email: u.email, active: u.active_flag }));
+  }
+
+  return { getCurrentUser, listUsers };
 }
 
 module.exports = { createPipedriveClient };

@@ -25,6 +25,7 @@ const { createOAuthRouter } = require('./routes/oauth');
 const { createCtiRouter } = require('./routes/cti');
 const { createSyncRouter } = require('./routes/sync');
 const { createCallsRouter } = require('./routes/calls');
+const { createTelephonyRouter } = require('./routes/telephony');
 
 function buildApp(config) {
   const app = express();
@@ -42,6 +43,7 @@ function buildApp(config) {
   // Persistence is optional for the slice — wired when a pool is available.
   let installStore;
   let syncStore;
+  let mappingStore;
   try {
     // eslint-disable-next-line global-require
     const { getPool } = require('./db/pool');
@@ -49,9 +51,12 @@ function buildApp(config) {
     const { createInstallStore } = require('./db/installStore');
     // eslint-disable-next-line global-require
     const { createSyncStore } = require('./db/syncStore');
+    // eslint-disable-next-line global-require
+    const { createMappingStore } = require('./db/mappingStore');
     const pool = getPool(config.databaseUrl);
     installStore = createInstallStore(pool, config.tokenEncKey);
     syncStore = createSyncStore(pool);
+    mappingStore = createMappingStore(pool);
   } catch (err) {
     // eslint-disable-next-line no-console
     console.warn('Persistence unavailable (token save + sync disabled):', err.message);
@@ -90,6 +95,10 @@ function buildApp(config) {
     app.use('/api/cti', createCtiRouter({ config, tokenService, personsClient }));
     app.use('/api/sync', createSyncRouter({ config, syncRunner, syncStore }));
     app.use('/api/calls', createCallsRouter({ config, tokenService, callLogsClient, syncStore }));
+    app.use(
+      '/api',
+      createTelephonyRouter({ config, installStore, ivrClient, mappingStore, tokenService, pipedriveClient })
+    );
 
     // Expose the scheduler so start() can begin the polling cadence.
     app.locals.scheduler = createScheduler({

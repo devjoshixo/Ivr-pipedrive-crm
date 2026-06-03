@@ -64,7 +64,8 @@ function createIvrClient({ baseUrl = DEFAULT_BASE_URL, fetchImpl = globalThis.fe
   }
 
   /**
-   * Trigger a click-to-call via GET /v1/c2c_get.
+   * Trigger a click-to-call via GET /v1/c2c_get. Rings the agent's endpoints
+   * (softphone + cell) then bridges to the customer.
    * @param {string} token
    * @param {{did: string, extNo: string, phone: string}} params
    * @returns {Promise<object>} {status, recordid, message?}
@@ -75,7 +76,35 @@ function createIvrClient({ baseUrl = DEFAULT_BASE_URL, fetchImpl = globalThis.fe
     return res.json();
   }
 
-  return { validateToken, fetchAllCallLogs, triggerClickToCall };
+  /**
+   * List the DIDs on the account (POST /api/get_dids).
+   * @returns {Promise<object>} raw IVR response (e.g. { dids: [...] })
+   */
+  async function getDids(token) {
+    const res = await fetchImpl(`${baseUrl}/api/get_dids`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: '{}',
+    });
+    if (!res.ok) throw new Error(`IVR get_dids returned ${res.status}`);
+    return res.json();
+  }
+
+  /**
+   * List the extensions on a DID (POST /v1/get_extension).
+   * @returns {Promise<object>} raw IVR response (e.g. { exts: [{ext, name, token}] })
+   */
+  async function getExtensions(token, did) {
+    const res = await fetchImpl(`${baseUrl}/v1/get_extension`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify({ did }),
+    });
+    if (!res.ok) throw new Error(`IVR get_extension returned ${res.status}`);
+    return res.json();
+  }
+
+  return { validateToken, fetchAllCallLogs, triggerClickToCall, getDids, getExtensions };
 }
 
 module.exports = { createIvrClient, DEFAULT_BASE_URL };

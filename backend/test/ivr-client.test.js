@@ -92,6 +92,25 @@ test('fetchAllCallLogs defaults missing cursors to empty strings', async () => {
   });
 });
 
+test('getDids POSTs to /api/get_dids with Bearer auth', async () => {
+  const { fetchImpl, calls } = fakeFetch({ dids: ['+918044475500'] });
+  const client = createIvrClient({ fetchImpl });
+  const res = await client.getDids('tok');
+  assert.deepEqual(res.dids, ['+918044475500']);
+  assert.equal(calls[0].url, `${DEFAULT_BASE_URL}/api/get_dids`);
+  assert.equal(calls[0].options.method, 'POST');
+  assert.equal(calls[0].options.headers.Authorization, 'Bearer tok');
+});
+
+test('getExtensions POSTs the did to /v1/get_extension', async () => {
+  const { fetchImpl, calls } = fakeFetch({ exts: [{ ext: '201', name: 'Agent' }] });
+  const client = createIvrClient({ fetchImpl });
+  const res = await client.getExtensions('tok', '+918044475500');
+  assert.equal(res.exts[0].ext, '201');
+  assert.equal(calls[0].url, `${DEFAULT_BASE_URL}/v1/get_extension`);
+  assert.deepEqual(JSON.parse(calls[0].options.body), { did: '+918044475500' });
+});
+
 test('triggerClickToCall builds the c2c_get query string', async () => {
   const { fetchImpl, calls } = fakeFetch({ status: 200, recordid: 'abc' });
   const client = createIvrClient({ fetchImpl });

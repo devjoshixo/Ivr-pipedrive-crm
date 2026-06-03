@@ -30,6 +30,16 @@ CREATE TABLE IF NOT EXISTS sync_state (
   last_error_at         TIMESTAMPTZ
 );
 
+-- DID + extension -> Pipedrive user mapping (click-to-call routing + call ownership).
+CREATE TABLE IF NOT EXISTS user_mappings (
+  company_id            TEXT NOT NULL REFERENCES installs(company_id) ON DELETE CASCADE,
+  pd_user_id            BIGINT NOT NULL,
+  did                   TEXT,
+  extension             TEXT,
+  updated_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (company_id, pd_user_id)
+);
+
 -- App-side dedupe ledger: Pipedrive custom fields can't enforce uniqueness, so we
 -- track which PBX call ids have been logged. Unique on (company_id, pbx_call_id).
 CREATE TABLE IF NOT EXISTS synced_calls (
