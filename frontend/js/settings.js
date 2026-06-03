@@ -121,6 +121,108 @@ async function save() {
   }
 }
 
+// ---------- DID / extension -> Pipedrive user mapping (c2c routing) ----------
+async function authedFetch(path, options = {}) {
+  const auth = await getSignedToken();
+  const res = await fetch(BACKEND_BASE + path, {
+    ...options,
+    headers: { ...(options.headers || {}), Authorization: `Bearer ${auth || ''}` },
+  });
+  return { ok: res.ok, data: await res.json().catch(() => null) };
+}
+
+let mapDids = [];
+const mapByUser = {};
+
+function mkOption(value, label, selected) {
+  const o = document.createElement('option');
+  o.value = value;
+  o.textContent = label;
+  if (selected) o.selected = true;
+  return o;
+}
+
+async function loadExtensions(did, extSel, selectedExt) {
+  extSel.innerHTML = '';
+  extSel.appendChild(mkOption('', '—'));
+  if (!did) return;
+  const r = await authedFetch(`/api/ivr/extensions?did=${encodeURIComponent(did)}`);
+  const exts = (r.ok && r.data && r.data.data && r.data.data.exts) || [];
+  exts.forEach((e) =>
+    extSel.appendChild(mkOption(e.ext, `${e.ext}${e.name ? ' — ' + e.name : ''}`, String(e.ext) === String(selectedExt)))
+  );
+}
+
+function buildMapRow(user) {
+  const existing = mapByUser[String(user.id)] || {};
+  const tr = document.createElement('tr');
+  const nameTd = document.createElement('td');
+  nameTd.textContent = user.name + (user.active === false ? ' (inactive)' : '');
+  tr.appendChild(nameTd);
+
+  const didSel = document.createElement('select');
+  didSel.appendChild(mkOption('', '—'));
+  mapDids.forEach((d) => didSel.appendChild(mkOption(d, d, d === existing.did)));
+  const didTd = document.createElement('td');
+  didTd.appendChild(didSel);
+  tr.appendChild(didTd);
+
+  const extSel = document.createElement('select');
+  const extTd = document.createElement('td');
+  extTd.appendChild(extSel);
+  tr.appendChild(extTd);
+
+  const saveMapBtn = document.createElement('button');
+  saveMapBtn.textContent = 'Save';
+  saveMapBtn.className = 'secondary';
+  const note = document.createElement('span');
+  note.className = 'maps-note';
+  const actTd = document.createElement('td');
+  actTd.appendChild(saveMapBtn);
+  actTd.appendChild(note);
+  tr.appendChild(actTd);
+
+  loadExtensions(existing.did, extSel, existing.extension);
+  didSel.addEventListener('change', () => loadExtensions(didSel.value, extSel, ''));
+  saveMapBtn.addEventListener('click', async () => {
+    saveMapBtn.disabled = true;
+    note.textContent = ' Saving…';
+    const r = await authedFetch('/api/mappings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pdUserId: String(user.id), did: didSel.value, extension: extSel.value }),
+    });
+    note.textContent = r.ok ? ' Saved ✓' : ' Failed';
+    saveMapBtn.disabled = false;
+  });
+  return tr;
+}
+
+async function loadMappings() {
+  const body = document.getElementById('mapRows');
+  if (!body) return;
+  try {
+    const [u, d, m] = await Promise.all([
+      authedFetch('/api/pd/users'),
+      authedFetch('/api/ivr/dids'),
+      authedFetch('/api/mappings'),
+    ]);
+    const users = (u.data && u.data.data && u.data.data.users) || [];
+    mapDids = (d.data && d.data.data && d.data.data.dids) || [];
+    ((m.data && m.data.data && m.data.data.mappings) || []).forEach((x) => {
+      mapByUser[String(x.pdUserId)] = x;
+    });
+    body.innerHTML = '';
+    if (!users.length) {
+      body.innerHTML = '<tr><td colspan="4" class="muted">No users found.</td></tr>';
+      return;
+    }
+    users.forEach((usr) => body.appendChild(buildMapRow(usr)));
+  } catch {
+    body.innerHTML = '<tr><td colspan="4" class="muted">Could not load — open inside Pipedrive.</td></tr>';
+  }
+}
+
 async function init() {
   try {
     sdk = await new AppExtensionsSDK().initialize();
@@ -135,6 +237,7 @@ async function init() {
     saveBtn.disabled = true;
     if (statusEl.textContent) setStatus('', '');
   });
+  loadMappings();
 }
 
 if (document.readyState === 'loading') {
