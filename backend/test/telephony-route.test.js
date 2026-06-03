@@ -38,7 +38,10 @@ function harness(overrides = {}) {
   };
   const installStore = { getIvrToken: async () => 'ivr-token', ...overrides.installStore };
   const tokenService = { getAccessToken: async () => ({ accessToken: 'AT', apiDomain: 'https://acme.pipedrive.com' }) };
-  const pipedriveClient = { listUsers: async () => [{ id: 1, name: 'Agent One' }] };
+  const pipedriveClient = {
+    listUsers: async () => [{ id: 1, name: 'Agent One' }],
+    getPerson: async (apiDomain, token, personId) => ({ id: Number(personId), name: 'Jane Roe', phones: ['+919910513597'] }),
+  };
   const config = { pipedrive: { jwtSecret: JWT_SECRET } };
 
   const app = express();
@@ -137,6 +140,19 @@ test('GET /api/mappings and POST /api/mappings work', async () => {
     });
     assert.equal(res.status, 200);
     assert.deepEqual(saved[0], { pdUserId: '42', did: '+918044475501', extension: '202' });
+  } finally {
+    server.close();
+  }
+});
+
+test('GET /api/pd/person returns the contact phones for call buttons', async () => {
+  const { app } = harness();
+  const server = await listen(app);
+  const { port } = server.address();
+  try {
+    const res = await (await fetch(`http://localhost:${port}/api/pd/person?personId=55`, { headers: { Authorization: `Bearer ${tokenWithUser}` } })).json();
+    assert.equal(res.data.person.name, 'Jane Roe');
+    assert.deepEqual(res.data.person.phones, ['+919910513597']);
   } finally {
     server.close();
   }

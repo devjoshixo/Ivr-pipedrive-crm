@@ -55,6 +55,21 @@ test('listUsers maps id/name/email/active from /api/v1/users', async () => {
   assert.equal(users[1].active, false);
 });
 
+test('getPerson returns name + flattened phone values', async () => {
+  const { fetchImpl, calls } = fakeFetch({
+    success: true,
+    data: {
+      id: 55,
+      name: 'Jane Roe',
+      phone: [{ value: '+919910513597', primary: true, label: 'work' }, { value: '08044475500', label: 'home' }],
+    },
+  });
+  const client = createPipedriveClient({ fetchImpl });
+  const p = await client.getPerson('https://acme.pipedrive.com', 'tok', 55);
+  assert.equal(calls[0].url, 'https://acme.pipedrive.com/api/v1/persons/55');
+  assert.deepEqual(p, { id: 55, name: 'Jane Roe', phones: ['+919910513597', '08044475500'] });
+});
+
 test('getCurrentUser throws on non-2xx', async () => {
   const { fetchImpl } = fakeFetch({ success: false }, { ok: false, status: 401 });
   const client = createPipedriveClient({ fetchImpl });

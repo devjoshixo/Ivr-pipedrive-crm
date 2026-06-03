@@ -6,11 +6,17 @@
     <title>IVRSolutions — Call Recordings</title>
     <style>
       body { margin: 0; font-family: Inter, system-ui, sans-serif; color: #1b1f24; padding: 14px; }
-      h2 { font-size: 14px; margin: 0 0 12px; }
+      h2 { font-size: 14px; margin: 0 0 10px; }
       .muted { color: #5f6b7a; font-size: 13px; }
       .item { border: 1px solid #e3e7ec; border-radius: 8px; padding: 8px 10px; margin-bottom: 10px; }
       .meta { font-size: 12px; color: #5f6b7a; margin-bottom: 6px; }
       audio { width: 100%; }
+      #callbar { margin-bottom: 16px; }
+      .callrow { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+      .callrow .num { font-family: ui-monospace, Menlo, monospace; font-size: 13px; min-width: 120px; }
+      .callrow button { padding: 5px 12px; border: 0; border-radius: 6px; background: #0b5cab; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
+      .callrow button.secondary { background: #eef1f5; color: #1b1f24; }
+      .callstatus { font-size: 12px; color: #5f6b7a; }
     </style>
   </head>
   <body>
@@ -22,6 +28,9 @@
       to load <audio> inside the Pipedrive panel iframe — verify CSP media-src in-product,
       as the Salesforce build had to (CSP Trusted Site with isApplicableToMediaSrc).
     -->
+    <h2>Call this contact</h2>
+    <div id="callbar"><p class="muted">Loading…</p></div>
+
     <h2>Call recordings</h2>
     <div id="calls"><p class="muted">Loading…</p></div>
 

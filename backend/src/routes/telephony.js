@@ -108,6 +108,24 @@ function createTelephonyRouter({ config, installStore, ivrClient, mappingStore, 
     }
   });
 
+  router.get('/pd/person', async (req, res) => {
+    let id;
+    try {
+      id = identify(req);
+    } catch {
+      return res.status(401).json(fail('Unauthorized'));
+    }
+    const personId = String(req.query.personId || '').trim();
+    if (!personId) return res.status(400).json(fail('personId is required'));
+    try {
+      const { accessToken, apiDomain } = await tokenService.getAccessToken(id.companyId);
+      const person = await pipedriveClient.getPerson(apiDomain, accessToken, personId);
+      return res.json(ok({ person }));
+    } catch {
+      return res.status(502).json(fail('Could not load the contact'));
+    }
+  });
+
   router.get('/pd/users', async (req, res) => {
     let id;
     try {

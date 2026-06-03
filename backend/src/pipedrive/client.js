@@ -49,7 +49,18 @@ function createPipedriveClient({ fetchImpl = globalThis.fetch } = {}) {
     return arr.map((u) => ({ id: u.id, name: u.name, email: u.email, active: u.active_flag }));
   }
 
-  return { getCurrentUser, listUsers };
+  /**
+   * GET /api/v1/persons/{id} — fetch a person's name + phone numbers (panel call buttons).
+   * @returns {Promise<{id, name, phones: string[]}>}
+   */
+  async function getPerson(apiDomain, accessToken, personId) {
+    const body = await get(apiDomain, accessToken, `/api/v1/persons/${personId}`);
+    const d = (body && body.data) || {};
+    const phones = Array.isArray(d.phone) ? d.phone.map((p) => p.value).filter(Boolean) : [];
+    return { id: d.id, name: d.name, phones };
+  }
+
+  return { getCurrentUser, listUsers, getPerson };
 }
 
 module.exports = { createPipedriveClient };
