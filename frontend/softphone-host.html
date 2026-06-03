@@ -6,7 +6,17 @@
     <title>IVRSolutions Softphone</title>
     <style>
       html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; background: #fff; }
-      #softphone { border: 0; width: 100%; height: 100%; display: block; }
+      #sizebar {
+        height: 26px; display: flex; align-items: center; gap: 4px; padding: 0 6px;
+        background: #f5f7fa; border-bottom: 1px solid #e3e7ec; font: 11px system-ui;
+      }
+      #sizebar .lbl { color: #5f6b7a; margin-right: 2px; }
+      #sizebar button {
+        border: 1px solid #d7dbe0; background: #fff; border-radius: 4px; font-size: 11px;
+        padding: 2px 7px; cursor: pointer; color: #1b1f24;
+      }
+      #sizebar button.active { background: #0b5cab; color: #fff; border-color: #0b5cab; }
+      #softphone { border: 0; width: 100%; height: calc(100% - 26px); display: block; }
     </style>
   </head>
   <body>
@@ -31,6 +41,12 @@
         - the VISIBILITY context field carrying the click-to-dial number.
       The CDN softphone must also send `CSP: frame-ancestors` allowing *.pipedrive.com.
     -->
+    <div id="sizebar">
+      <span class="lbl">Size</span>
+      <button type="button" data-h="420">S</button>
+      <button type="button" data-h="560">M</button>
+      <button type="button" data-h="700">L</button>
+    </div>
     <iframe
       id="softphone"
       src="https://cdn.founderscart.com/app/ivrsolutions/webrtc/softphone/index.html"

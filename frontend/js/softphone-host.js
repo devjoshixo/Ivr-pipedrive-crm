@@ -115,8 +115,14 @@ window.addEventListener('message', (event) => {
       break;
     case 'IVR_INCOMING_CALL':
       if (sdk) {
+        // Surface the window (if hidden/minimized) and show a banner.
         sdk.execute(Command.SHOW_FLOATING_WINDOW).catch(() => {});
         setFocus(true);
+        sdk
+          .execute(Command.SHOW_SNACKBAR, {
+            message: `Incoming call${m.number ? ' from ' + m.number : ''}`,
+          })
+          .catch(() => {});
       }
       if (m.number) screenPop(m.number);
       break;
@@ -139,8 +145,26 @@ window.addEventListener('message', (event) => {
 });
 
 // The softphone needs the full floating-window height or its content is clipped.
-// Window limits are 70–700 high, 200–800 wide; we size near the top of that range.
-const WINDOW_SIZE = { height: 700, width: 400 };
+// Window limits are 70–700 high, 200–800 wide; default to the tallest preset.
+const WINDOW_WIDTH = 400;
+const WINDOW_SIZE = { height: 700, width: WINDOW_WIDTH };
+
+async function resizeTo(height) {
+  try {
+    await sdk.execute(Command.RESIZE, { height, width: WINDOW_WIDTH });
+  } catch {
+    /* non-fatal */
+  }
+  document.querySelectorAll('#sizebar button').forEach((b) => {
+    b.classList.toggle('active', Number(b.dataset.h) === height);
+  });
+}
+
+function setupSizeBar() {
+  document.querySelectorAll('#sizebar button').forEach((b) => {
+    b.addEventListener('click', () => resizeTo(Number(b.dataset.h)));
+  });
+}
 
 async function init() {
   try {
@@ -151,13 +175,8 @@ async function init() {
     return;
   }
   refreshSignedToken();
-
-  // Enforce the size after init too (some hosts ignore the initialize size).
-  try {
-    await sdk.execute(Command.RESIZE, { height: WINDOW_SIZE.height, width: WINDOW_SIZE.width });
-  } catch {
-    /* non-fatal */
-  }
+  setupSizeBar();
+  resizeTo(WINDOW_SIZE.height); // enforce + mark the default preset active
 
   // Click-to-dial: VISIBILITY fires when the window is shown from a phone-field click.
   sdk.listen(Event.VISIBILITY, (payload) => {
