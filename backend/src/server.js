@@ -57,7 +57,7 @@ function buildApp(config) {
   }
 
   app.use('/api', createHealthRouter());
-  app.use('/api/settings', createSettingsRouter({ ivrClient, installStore }));
+  app.use('/api/settings', createSettingsRouter({ ivrClient, installStore, config }));
 
   // Pipedrive OAuth + CTI + sync — wired only when credentials + persistence exist.
   if (installStore && syncStore && config.pipedrive.clientId && config.pipedrive.clientSecret) {

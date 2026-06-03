@@ -7,6 +7,7 @@
 // token is validated/stored server-side and never exposed in iframe code.
 
 const express = require('express');
+const { verifySignedToken } = require('../pipedrive/jwt');
 
 // Consistent API envelope (see common/patterns.md).
 const ok = (data) => ({ success: true, data, error: null });
@@ -16,9 +17,29 @@ const fail = (message) => ({ success: false, data: null, error: message });
  * @param {object} deps
  * @param {{validateToken: Function}} deps.ivrClient
  * @param {{saveIvrToken: Function}} [deps.installStore] - omitted in the no-DB slice
+ * @param {object} [deps.config] - for verifying the SDK signed token on save
  */
-function createSettingsRouter({ ivrClient, installStore }) {
+function createSettingsRouter({ ivrClient, installStore, config }) {
   const router = express.Router();
+  const jwtSecret = config && config.pipedrive && (config.pipedrive.jwtSecret || config.pipedrive.clientSecret);
+
+  // Resolve the company: prefer the verified SDK signed token (Authorization header,
+  // used when the page runs inside Pipedrive); fall back to the companyId in the body
+  // (the standalone post-OAuth redirect flow).
+  function resolveCompanyId(req) {
+    const auth = req.headers.authorization || '';
+    const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+    if (token && jwtSecret) {
+      try {
+        const claims = verifySignedToken(token, jwtSecret);
+        const id = claims.companyId ?? claims.company_id;
+        if (id != null) return String(id);
+      } catch {
+        /* fall through to body */
+      }
+    }
+    return typeof req.body?.companyId === 'string' ? req.body.companyId.trim() : '';
+  }
 
   // POST /api/settings/validate-token  { token }
   router.post('/validate-token', async (req, res) => {
@@ -34,13 +55,16 @@ function createSettingsRouter({ ivrClient, installStore }) {
     }
   });
 
-  // POST /api/settings/save-token  { token, companyId }
+  // POST /api/settings/save-token  { token }  (company from SDK token or body fallback)
   // Validates first, then persists sealed. Requires the DB store to be wired.
   router.post('/save-token', async (req, res) => {
     const token = typeof req.body?.token === 'string' ? req.body.token.trim() : '';
-    const companyId = typeof req.body?.companyId === 'string' ? req.body.companyId.trim() : '';
-    if (!token || !companyId) {
-      return res.status(400).json(fail('token and companyId are required'));
+    const companyId = resolveCompanyId(req);
+    if (!token) {
+      return res.status(400).json(fail('token is required'));
+    }
+    if (!companyId) {
+      return res.status(401).json(fail('Could not resolve the company (open inside Pipedrive)'));
     }
     if (!installStore) {
       return res.status(503).json(fail('Persistence is not configured'));
