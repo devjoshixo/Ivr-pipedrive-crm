@@ -62,6 +62,15 @@
       th { font-size: 11px; color: var(--muted); font-weight: 600; }
       select { padding: 5px 7px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; max-width: 190px; }
       .maps-note { font-size: 12px; color: var(--muted); }
+      .stats { display: flex; gap: 12px; text-align: center; margin: 10px 0; }
+      .stat { flex: 1; border: 1px solid var(--border); border-radius: 8px; padding: 10px 6px; }
+      .stat .num { display: block; font-size: 24px; font-weight: 700; color: var(--brand); }
+      .stat .cap { font-size: 11px; color: var(--muted); }
+      .kv { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0; }
+      .kv .value { color: #1b1f24; }
+      .kv .value.err { color: var(--err); }
+      .apikey { font-family: ui-monospace, Menlo, monospace; font-size: 13px; background: #f5f7fa;
+                border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; margin: 8px 0; word-break: break-all; }
       .spinner {
         width: 14px; height: 14px; border: 2px solid #cdd4dc; border-top-color: var(--brand);
         border-radius: 50%; animation: spin 0.7s linear infinite;
@@ -102,6 +111,31 @@
         </thead>
         <tbody id="mapRows"><tr><td colspan="4" class="muted">Loading…</td></tr></tbody>
       </table>
+
+      <h2>Sync status</h2>
+      <div class="stats">
+        <div class="stat"><span class="num" id="statCalls">…</span><span class="cap">Calls logged</span></div>
+        <div class="stat"><span class="num" id="statPeople">…</span><span class="cap">Contacts/Leads</span></div>
+        <div class="stat"><span class="num" id="statRecordings">…</span><span class="cap">Recordings</span></div>
+      </div>
+      <div class="kv"><span class="muted">Last sync</span><span class="value" id="lastSync">…</span></div>
+      <div class="kv"><span class="muted">Last error</span><span class="value" id="lastError">…</span></div>
+      <div class="actions">
+        <button id="runBtn" class="secondary" type="button">Run sync now</button>
+        <span id="runResult" class="maps-note"></span>
+      </div>
+
+      <h2>API key (server-to-server)</h2>
+      <div id="apiKeyBox" class="apikey">…</div>
+      <div class="actions">
+        <button id="genKeyBtn" class="secondary" type="button">Generate / Regenerate key</button>
+        <span id="keyResult" class="maps-note"></span>
+      </div>
+      <p class="hint">
+        Paste this key into the FoundersCart website to let it call this integration's APIs
+        for your account. Shown in full only once — copy it immediately. Regenerating
+        invalidates the old key.
+      </p>
     </div>
 
     <script type="module" src="js/settings.js"></script>

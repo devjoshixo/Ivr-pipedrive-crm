@@ -223,6 +223,90 @@ async function loadMappings() {
   }
 }
 
+// ---------- Sync status + stats + manual run ----------
+function fmtTime(iso) {
+  if (!iso) return 'never';
+  try {
+    return new Date(iso).toLocaleString();
+  } catch {
+    return iso;
+  }
+}
+
+async function loadStatus() {
+  const el = (id) => document.getElementById(id);
+  try {
+    const r = await authedFetch('/api/sync/status');
+    if (!r.ok || !r.data || !r.data.data) return;
+    const d = r.data.data;
+    el('lastSync').textContent = fmtTime(d.lastSyncAt);
+    const err = el('lastError');
+    if (d.lastError) {
+      err.textContent = d.lastError;
+      err.className = 'value err';
+    } else {
+      err.textContent = 'none';
+      err.className = 'value';
+    }
+    const s = d.stats || {};
+    el('statCalls').textContent = s.total != null ? s.total : '–';
+    el('statPeople').textContent = s.people != null ? s.people : '–';
+    el('statRecordings').textContent = s.withRecording != null ? s.withRecording : '–';
+  } catch {
+    /* leave placeholders */
+  }
+}
+
+async function runSync() {
+  const btn = document.getElementById('runBtn');
+  const out = document.getElementById('runResult');
+  btn.disabled = true;
+  out.textContent = ' Running…';
+  try {
+    const r = await authedFetch('/api/sync/run', { method: 'POST' });
+    const d = r.data && r.data.data;
+    out.textContent = r.ok && d ? ` Done — ${d.created} new, ${d.reconciled} updated.` : ' Sync failed';
+  } catch {
+    out.textContent = ' Backend unreachable';
+  } finally {
+    btn.disabled = false;
+    loadStatus();
+  }
+}
+
+// ---------- Server-to-server API key ----------
+async function loadApiKey() {
+  try {
+    const r = await authedFetch('/api/apikey');
+    const meta = r.ok && r.data && r.data.data && r.data.data.key;
+    document.getElementById('apiKeyBox').textContent = meta
+      ? `${meta.prefix}…  (created ${fmtTime(meta.createdAt)})`
+      : 'No key yet — click Generate.';
+  } catch {
+    document.getElementById('apiKeyBox').textContent = 'Could not load key.';
+  }
+}
+
+async function regenerateKey() {
+  const btn = document.getElementById('genKeyBtn');
+  const out = document.getElementById('keyResult');
+  btn.disabled = true;
+  out.textContent = ' Generating…';
+  try {
+    const r = await authedFetch('/api/apikey/regenerate', { method: 'POST' });
+    if (r.ok && r.data && r.data.data) {
+      document.getElementById('apiKeyBox').textContent = r.data.data.key; // shown once
+      out.textContent = ' Copy it now — not shown again.';
+    } else {
+      out.textContent = ' Failed';
+    }
+  } catch {
+    out.textContent = ' Backend unreachable';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 async function init() {
   try {
     sdk = await new AppExtensionsSDK().initialize();
@@ -237,7 +321,13 @@ async function init() {
     saveBtn.disabled = true;
     if (statusEl.textContent) setStatus('', '');
   });
+  const runBtn = document.getElementById('runBtn');
+  const genBtn = document.getElementById('genKeyBtn');
+  if (runBtn) runBtn.addEventListener('click', runSync);
+  if (genBtn) genBtn.addEventListener('click', regenerateKey);
   loadMappings();
+  loadStatus();
+  loadApiKey();
 }
 
 if (document.readyState === 'loading') {
