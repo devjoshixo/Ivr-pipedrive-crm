@@ -165,6 +165,23 @@ function createSyncStore(pool, tables = tableNames()) {
     return rows[0] || null;
   }
 
+  /**
+   * Delete dedupe-ledger rows older than `retentionDays`. Safe storage hygiene: the
+   * IVR API already excludes these calls (its server-side cursor only returns records
+   * newer than sync_state.last_*_id), so a pruned old row can never be re-fetched and
+   * thus can't cause a duplicate. The cursors live in sync_state and are never pruned.
+   * @param {number} retentionDays - rows older than this are removed; <=0 disables (no-op)
+   * @param {{now?: number}} [opts]
+   * @returns {Promise<number>} rows deleted
+   */
+  async function pruneSyncedCalls(retentionDays, { now = Date.now() } = {}) {
+    const days = Number(retentionDays);
+    if (!Number.isFinite(days) || days <= 0) return 0;
+    const cutoff = new Date(now - days * 24 * 60 * 60 * 1000);
+    const { rows } = await pool.query(`DELETE FROM ${CALLS} WHERE created_at < $1`, [cutoff]);
+    return (rows && rows.affectedRows) || 0;
+  }
+
   /** Aggregate counts for the setup dashboard. */
   async function getStats(companyId) {
     const { rows } = await pool.query(
@@ -194,6 +211,7 @@ function createSyncStore(pool, tables = tableNames()) {
     getRealtimeBySip,
     getBySip,
     markRecordingAttached,
+    pruneSyncedCalls,
     recentForPerson,
     recordError,
     recordSuccess,

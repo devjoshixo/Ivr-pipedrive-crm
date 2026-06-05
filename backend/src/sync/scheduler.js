@@ -6,17 +6,49 @@
 // the admin when to go faster).
 
 const DEFAULT_INTERVAL_MS = 15 * 60 * 1000;
+const DEFAULT_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000; // prune at most once a day
 
 /**
  * @param {object} deps
  * @param {{listConnectedCompanyIds: Function}} deps.installStore
  * @param {{runForCompany: Function}} deps.syncRunner
+ * @param {{pruneSyncedCalls: Function}} [deps.syncStore] - enables ledger pruning
  * @param {number} [deps.intervalMs]
+ * @param {number} [deps.retentionDays] - prune ledger rows older than this; <=0 disables
+ * @param {number} [deps.pruneIntervalMs] - min gap between prunes (default 24h)
  * @param {Console} [deps.logger]
+ * @param {() => number} [deps.now]
  */
-function createScheduler({ installStore, syncRunner, intervalMs = DEFAULT_INTERVAL_MS, logger = console }) {
+function createScheduler({
+  installStore,
+  syncRunner,
+  syncStore,
+  intervalMs = DEFAULT_INTERVAL_MS,
+  retentionDays = 0,
+  pruneIntervalMs = DEFAULT_PRUNE_INTERVAL_MS,
+  logger = console,
+  now = () => Date.now(),
+}) {
   let handle = null;
   let inFlight = false; // prevents overlapping ticks at tight intervals (e.g. 30s)
+  let lastPruneAt = 0;
+
+  // Throttled ledger cleanup. Runs at most once per pruneIntervalMs, independent of
+  // the sync cadence. No-op unless a syncStore + positive retention are configured.
+  async function maybePrune() {
+    if (!syncStore || typeof syncStore.pruneSyncedCalls !== 'function' || retentionDays <= 0) return;
+    const t = now();
+    if (t - lastPruneAt < pruneIntervalMs) return;
+    lastPruneAt = t;
+    try {
+      const deleted = await syncStore.pruneSyncedCalls(retentionDays, { now: t });
+      if (deleted > 0) {
+        logger.log(`Pruned ${deleted} synced_calls row(s) older than ${retentionDays}d`);
+      }
+    } catch (err) {
+      logger.error('Ledger prune failed:', err.message);
+    }
+  }
 
   async function tick() {
     if (inFlight) {
@@ -40,6 +72,7 @@ function createScheduler({ installStore, syncRunner, intervalMs = DEFAULT_INTERV
           logger.error(`Scheduled sync failed for ${id}:`, err.message);
         }
       }
+      await maybePrune();
       return { ran, total: ids.length };
     } finally {
       inFlight = false;

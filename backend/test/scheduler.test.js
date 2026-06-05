@@ -56,6 +56,39 @@ test('a tick does not overlap a still-running tick (skips instead)', async () =>
   assert.equal(firstResult.ran, 1);
 });
 
+test('tick prunes the ledger once per prune interval when retention is set', async () => {
+  const pruneCalls = [];
+  let clock = 1_000_000;
+  const scheduler = createScheduler({
+    installStore: { listConnectedCompanyIds: async () => ['c1'] },
+    syncRunner: { runForCompany: async () => {} },
+    syncStore: { pruneSyncedCalls: async (days) => { pruneCalls.push(days); return 5; } },
+    retentionDays: 30,
+    pruneIntervalMs: 10_000,
+    now: () => clock,
+    logger: silentLogger,
+  });
+
+  await scheduler.tick();                 // first tick → prunes
+  await scheduler.tick();                 // same clock → within interval → no prune
+  clock += 10_000;                        // advance past the interval
+  await scheduler.tick();                 // → prunes again
+  assert.deepEqual(pruneCalls, [30, 30]);
+});
+
+test('tick does not prune when retention is 0 (disabled)', async () => {
+  let pruned = false;
+  const scheduler = createScheduler({
+    installStore: { listConnectedCompanyIds: async () => ['c1'] },
+    syncRunner: { runForCompany: async () => {} },
+    syncStore: { pruneSyncedCalls: async () => { pruned = true; return 0; } },
+    retentionDays: 0,
+    logger: silentLogger,
+  });
+  await scheduler.tick();
+  assert.equal(pruned, false);
+});
+
 test('tick handles a failure listing companies gracefully', async () => {
   const scheduler = createScheduler({
     installStore: {

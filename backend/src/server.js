@@ -118,7 +118,9 @@ function buildApp(config) {
     app.locals.scheduler = createScheduler({
       installStore,
       syncRunner,
+      syncStore,
       intervalMs: config.syncIntervalMs,
+      retentionDays: config.syncedCallsRetentionDays,
     });
   } else {
     // eslint-disable-next-line no-console

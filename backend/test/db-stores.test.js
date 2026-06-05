@@ -111,6 +111,27 @@ if (!TEST_DB) {
     assert.equal(stats.people, 1);
   });
 
+  test('syncStore: pruneSyncedCalls removes only old rows; cursors untouched', async () => {
+    // rec-1 was inserted in the prior test (recent). Add an old row, then prune at 30d.
+    await syncStore.markSeen(CO, {
+      pbxCallId: 'old-1', sipCallId: 'sip-old', pdCallLogId: 'cl-old', personId: 99,
+      recordingUrl: null, recordingAttached: true, source: 'sync',
+    });
+    // Backdate it 60 days via a direct update (created_at isn't settable through the store).
+    await pool.query(
+      `UPDATE ${tables.syncedCalls} SET created_at = $2 WHERE company_id = $1 AND pbx_call_id = 'old-1'`,
+      [CO, new Date(Date.now() - 60 * 24 * 60 * 60 * 1000)]
+    );
+
+    assert.equal(await syncStore.pruneSyncedCalls(0), 0, 'retention 0 is a no-op');
+    const deleted = await syncStore.pruneSyncedCalls(30);
+    assert.equal(deleted, 1, 'only the 60-day-old row is pruned');
+    assert.equal(await syncStore.getBySip(CO, 'sip-old'), null, 'old row gone');
+    assert.ok(await syncStore.getBySip(CO, 'sip-1'), 'recent row kept');
+    // Cursor still intact after pruning.
+    assert.equal((await syncStore.getCursors(CO)).lastCallLogId, '105');
+  });
+
   test('mappingStore: save, list, lookup by user and by extension', async () => {
     await mappingStore.saveMapping(CO, { pdUserId: '31751199', did: '+918044475500', extension: '201' });
     const list = await mappingStore.listMappings(CO);
