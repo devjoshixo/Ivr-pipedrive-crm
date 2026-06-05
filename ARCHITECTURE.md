@@ -23,8 +23,8 @@ The shared softphone (Browser-Phone) is **not** rebuilt — it stays on the CDN
 |---|---|---|
 | **Distribution** | Private app first → public Marketplace later | Private apps need no Pipedrive review, install via link, full production. Same OAuth app promotes to public when mature (mirrors the Salesforce "Beta first" path). |
 | **Softphone placement** | Custom **Floating Window** (softphone) + Custom **Panel** (sidebar) | Floating window is Pipedrive's official caller surface — always visible, persists across navigation, auto-binds phone-field clicks. Panel adds screen-pop context + recording playback on Person/Deal/Org pages. |
-| **Backend** | Node.js + Express + Postgres | Holds OAuth `client_secret`, encrypted IVR tokens, the 15-min cron + sync cursors, and inbound-call signaling. Browser-only (the Zoho model) is **not viable** on Pipedrive. |
-| **Call logging** | Native **CallLogs API** (`POST /v1/callLogs`) + **app-side dedupe** | Populates Pipedrive's native Call tab and supports recording upload. Pipedrive custom fields can't enforce uniqueness, so dedupe on PBX `recordid` lives in our Postgres. |
+| **Backend** | Node.js + Express + MariaDB/MySQL | Holds OAuth `client_secret`, encrypted IVR tokens, the 15-min cron + sync cursors, and inbound-call signaling. Browser-only (the Zoho model) is **not viable** on Pipedrive. |
+| **Call logging** | Native **CallLogs API** (`POST /v1/callLogs`) + **app-side dedupe** | Populates Pipedrive's native Call tab and supports recording upload. Pipedrive custom fields can't enforce uniqueness, so dedupe on PBX `recordid` lives in our database. |
 
 ## Pipedrive platform facts (live docs, 2025-2026)
 
@@ -50,13 +50,13 @@ These correct several assumptions in the original kickoff prompt:
 
 ```
 Pipedrive/
-  backend/                  Node.js + Express + Postgres
+  backend/                  Node.js + Express + MariaDB/MySQL
     src/
       config.js             env loading + validation
       crypto.js             AES-256-GCM for IVR token at rest
       ivr/client.js         IVR API client (validate, all_call_logs, c2c) — injectable fetch
       pipedrive/            OAuth + REST client (persons search, callLogs, custom fields)  [TODO]
-      db/                   pg pool, schema, token/cursor stores
+      db/                   mysql2 pool, schema, token/cursor stores
       routes/               settings (token validate/save), health, oauth  [oauth TODO]
       sync/                 15-min cron worker (cursor-paged backfill)       [TODO]
     test/                   node:test unit tests (no external deps)
@@ -93,7 +93,7 @@ Direction logic:
 - `click_to_call_logs` + `dialer_logs` → always outbound, customer = `client_no`.
 
 Dedupe key = `recordid` for `call_logs` (matches the real-time path's `sip_call_id` reconciliation),
-`c2c-`/`dialer-` prefixed for the other two — stored in our Postgres `synced_calls` table.
+`c2c-`/`dialer-` prefixed for the other two — stored in our `synced_calls` table.
 
 Phone normalization: strip non-digits, take last 10; query Pipedrive persons search with variants
 (`<10digit>`, `91<10>`, `+91<10>`, `0<10>`); cache map per run.

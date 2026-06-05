@@ -1,7 +1,7 @@
 'use strict';
 
 // Settings routes — the milestone-1 slice: validate an IVR token against the live
-// IVR API, and (optionally) save it sealed in Postgres.
+// IVR API, and (optionally) save it sealed in MariaDB/MySQL.
 //
 // The browser settings page calls THIS backend, never the IVR API directly, so the
 // token is validated/stored server-side and never exposed in iframe code.

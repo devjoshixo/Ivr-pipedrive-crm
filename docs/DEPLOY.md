@@ -1,7 +1,7 @@
 # Deployment Guide — IVRSolutions for Pipedrive
 
 The app is config-only to deploy (no code changes for your domain). Two ways: Docker
-Compose (simplest) or bare Node. **Requires PostgreSQL** (14+).
+Compose (simplest) or bare Node. **Requires MariaDB 10.6+ / MySQL 8+**.
 
 Replace `<DOMAIN>` with your production HTTPS domain, e.g. `pipedrive.founderscart.com`.
 
