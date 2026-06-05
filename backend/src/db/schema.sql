@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS {{PREFIX}}sync_state (
   last_sync_at          DATETIME NULL,
   last_error            TEXT,                            -- includes saturation WARN (>=20/category)
   last_error_at         DATETIME NULL,
+  cursor_held           TINYINT(1) NOT NULL DEFAULT 0,   -- 1 when a failure is holding a cursor (blocks pruning)
   PRIMARY KEY (company_id),
   CONSTRAINT fk_{{PREFIX}}sync_company FOREIGN KEY (company_id)
     REFERENCES {{PREFIX}}installs(company_id) ON DELETE CASCADE

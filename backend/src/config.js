@@ -53,9 +53,11 @@ function loadConfig() {
     // are cheap (no Pipedrive cost); a 10s hard floor avoids hammering the IVR API.
     syncIntervalMs: Math.max(10000, Number(optional('SYNC_INTERVAL_MS', '30000')) || 30000),
 
-    // Dedupe-ledger retention: synced_calls rows older than this are auto-pruned
-    // (safe — the IVR cursor already excludes those calls). 0 disables pruning.
-    syncedCallsRetentionDays: Math.max(0, Number(optional('SYNCED_CALLS_RETENTION_DAYS', '90')) || 0),
+    // Dedupe-ledger retention: synced_calls rows older than this are auto-pruned.
+    // Off by default (0) — the ledger is tiny (~300 B/row) and pruning is only an
+    // optional optimisation for very high volume. When enabled it is duplicate-safe
+    // (skips companies whose cursor is held by a failure).
+    syncedCallsRetentionDays: Math.max(0, Number(optional('SYNCED_CALLS_RETENTION_DAYS', '0')) || 0),
 
     // Per-company rate limit on the team-facing API endpoints.
     rateLimitMax: Number(optional('RATE_LIMIT_MAX', '120')) || 120,

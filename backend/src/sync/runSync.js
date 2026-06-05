@@ -211,6 +211,12 @@ function createSyncRunner({
       lastDialerLogId: advance('dialer', resp.dialer_logs, cursors.lastDialerLogId),
     });
 
+    // A held cursor (failure re-pulling a page) must block pruning of that page's
+    // already-succeeded rows, or they'd be re-created as duplicates next run.
+    if (typeof syncStore.setCursorHeld === 'function') {
+      await syncStore.setCursorHeld(companyId, failedCategories.size > 0);
+    }
+
     const saturated = Object.entries(counts)
       .filter(([, n]) => n >= PAGE_SIZE)
       .map(([k]) => k);

@@ -124,6 +124,14 @@ if (!TEST_DB) {
     );
 
     assert.equal(await syncStore.pruneSyncedCalls(0), 0, 'retention 0 is a no-op');
+
+    // Held cursor (unresolved failure) must block pruning entirely for this company.
+    await syncStore.setCursorHeld(CO, true);
+    assert.equal(await syncStore.pruneSyncedCalls(30), 0, 'no prune while cursor is held');
+    assert.ok(await syncStore.getBySip(CO, 'sip-old'), 'old row kept while held');
+
+    // Cursor healthy again → the 60-day-old row prunes, the recent one stays.
+    await syncStore.setCursorHeld(CO, false);
     const deleted = await syncStore.pruneSyncedCalls(30);
     assert.equal(deleted, 1, 'only the 60-day-old row is pruned');
     assert.equal(await syncStore.getBySip(CO, 'sip-old'), null, 'old row gone');

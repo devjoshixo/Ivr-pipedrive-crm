@@ -166,10 +166,25 @@ function createSyncStore(pool, tables = tableNames()) {
   }
 
   /**
-   * Delete dedupe-ledger rows older than `retentionDays`. Safe storage hygiene: the
-   * IVR API already excludes these calls (its server-side cursor only returns records
-   * newer than sync_state.last_*_id), so a pruned old row can never be re-fetched and
-   * thus can't cause a duplicate. The cursors live in sync_state and are never pruned.
+   * Record whether a cursor is currently held (a failure is blocking cursor advance).
+   * Pruning skips companies whose cursor is held, so it never deletes a ledger row the
+   * sync might still re-pull and re-create.
+   */
+  async function setCursorHeld(companyId, held) {
+    await pool.query(`UPDATE ${STATE} SET cursor_held = $2 WHERE company_id = $1`, [
+      companyId,
+      held ? 1 : 0,
+    ]);
+  }
+
+  /**
+   * Delete dedupe-ledger rows older than `retentionDays`. Storage hygiene that is safe
+   * because of two guards:
+   *   1. The IVR API only returns calls NEWER than sync_state.last_*_id, so a settled
+   *      old row can never be re-fetched (and the cursors are never pruned).
+   *   2. We skip any company whose cursor is HELD (cursor_held=1) — i.e. a failure is
+   *      blocking cursor advance and the page is being re-pulled. Without this, pruning
+   *      a succeeded row in a stuck page would let it be re-created as a duplicate.
    * @param {number} retentionDays - rows older than this are removed; <=0 disables (no-op)
    * @param {{now?: number}} [opts]
    * @returns {Promise<number>} rows deleted
@@ -178,7 +193,12 @@ function createSyncStore(pool, tables = tableNames()) {
     const days = Number(retentionDays);
     if (!Number.isFinite(days) || days <= 0) return 0;
     const cutoff = new Date(now - days * 24 * 60 * 60 * 1000);
-    const { rows } = await pool.query(`DELETE FROM ${CALLS} WHERE created_at < $1`, [cutoff]);
+    const { rows } = await pool.query(
+      `DELETE ${CALLS} FROM ${CALLS}
+         JOIN ${STATE} ON ${STATE}.company_id = ${CALLS}.company_id
+       WHERE ${CALLS}.created_at < $1 AND ${STATE}.cursor_held = 0`,
+      [cutoff]
+    );
     return (rows && rows.affectedRows) || 0;
   }
 
@@ -216,6 +236,7 @@ function createSyncStore(pool, tables = tableNames()) {
     recordError,
     recordSuccess,
     getSyncState,
+    setCursorHeld,
     getStats,
   };
 }
