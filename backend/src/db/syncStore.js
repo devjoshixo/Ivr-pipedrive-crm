@@ -93,6 +93,26 @@ function createSyncStore(pool) {
     return m;
   }
 
+  /**
+   * Look up the most recent ledger row for a SIP Call-ID. Powers the late-note
+   * back-fill, which needs the linked person + pbx id for an already-logged call.
+   * @returns {Promise<{pbxCallId, pdCallLogId, personId}|null>}
+   */
+  async function getBySip(companyId, sipCallId) {
+    if (!sipCallId) return null;
+    const { rows } = await pool.query(
+      `SELECT pbx_call_id, pd_call_log_id, pd_person_id
+       FROM synced_calls
+       WHERE company_id = $1 AND sip_call_id = $2
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [companyId, sipCallId]
+    );
+    const r = rows[0];
+    if (!r) return null;
+    return { pbxCallId: r.pbx_call_id, pdCallLogId: r.pd_call_log_id, personId: r.pd_person_id };
+  }
+
   async function markRecordingAttached(companyId, sipCallId, { recordingUrl, attached }) {
     await pool.query(
       `UPDATE synced_calls
@@ -170,6 +190,7 @@ function createSyncStore(pool) {
     filterSeen,
     markSeen,
     getRealtimeBySip,
+    getBySip,
     markRecordingAttached,
     recentForPerson,
     recordError,

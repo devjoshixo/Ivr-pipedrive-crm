@@ -80,6 +80,20 @@ async function logCallEnded(m) {
   }
 }
 
+async function saveLateNote(sipCallId, note) {
+  if (!sipCallId || !note) return;
+  if (!signedToken) await refreshSignedToken();
+  try {
+    await fetch(`${BACKEND_BASE}/api/calls/note`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${signedToken || ''}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sipCallId, note }),
+    });
+  } catch {
+    /* non-fatal: the note stays in the softphone; the agent can retry */
+  }
+}
+
 async function screenPop(number) {
   const match = await lookupPerson(number);
   lastPersonId = match && match.personId ? match.personId : null;
@@ -132,6 +146,10 @@ window.addEventListener('message', (event) => {
     case 'IVR_CALL_ENDED':
       if (sdk) setFocus(false);
       logCallEnded(m);
+      break;
+    case 'IVR_NOTE_SAVED':
+      // Note typed after the call was logged — back-fill it onto the linked person.
+      saveLateNote(m.sipCallId, m.note);
       break;
     case 'IVR_SAVE_CONTACT':
       if (sdk) {

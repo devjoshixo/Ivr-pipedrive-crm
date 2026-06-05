@@ -15,6 +15,7 @@ const { createPersonsClient } = require('./pipedrive/persons');
 const { createLeadsClient } = require('./pipedrive/leads');
 const { createCallLogsClient } = require('./pipedrive/callLogs');
 const { createRecordingsClient } = require('./pipedrive/recordings');
+const { createNotesClient } = require('./pipedrive/notes');
 const { createTokenService } = require('./pipedrive/tokenService');
 const { createSyncRunner } = require('./sync/runSync');
 const { createScheduler } = require('./sync/scheduler');
@@ -84,6 +85,7 @@ function buildApp(config) {
     const leadsClient = createLeadsClient({ fetchImpl: pdFetch });
     const callLogsClient = createCallLogsClient({ fetchImpl: pdFetch });
     const recordingsClient = createRecordingsClient({ fetchImpl: pdFetch });
+    const notesClient = createNotesClient({ fetchImpl: pdFetch });
     const tokenService = createTokenService({ installStore, oauthClient });
     const syncRunner = createSyncRunner({
       ivrClient,
@@ -102,7 +104,7 @@ function buildApp(config) {
     app.use('/oauth', createOAuthRouter({ config, oauthClient, pipedriveClient, installStore }));
     app.use('/api/cti', createCtiRouter({ config, tokenService, personsClient, apiKeyStore, limiter }));
     app.use('/api/sync', createSyncRouter({ config, syncRunner, syncStore, apiKeyStore, limiter }));
-    app.use('/api/calls', createCallsRouter({ config, tokenService, callLogsClient, syncStore, apiKeyStore, limiter }));
+    app.use('/api/calls', createCallsRouter({ config, tokenService, callLogsClient, notesClient, syncStore, apiKeyStore, limiter }));
     app.use('/api/apikey', createApiKeyRouter({ config, apiKeyStore }));
     app.use(
       '/api',

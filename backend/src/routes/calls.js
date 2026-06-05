@@ -13,6 +13,7 @@ const { z } = require('zod');
 const { createApiGuard } = require('../middleware/apiGuard');
 const { validateBody } = require('../middleware/validate');
 const { buildCallLogPayload } = require('../sync/callLogPayload');
+const { buildLateNoteContent } = require('../notes/lateNote');
 
 const callBodySchema = z.object({
   sipCallId: z.string().min(1, 'is required'),
@@ -26,6 +27,12 @@ const callBodySchema = z.object({
   orgId: z.coerce.number().int().positive().optional(),
 });
 
+// Late note: an agent typed a note in the softphone after the call was already logged.
+const noteBodySchema = z.object({
+  sipCallId: z.string().min(1, 'is required'),
+  note: z.string().min(1, 'is required').max(5000),
+});
+
 const ok = (data) => ({ success: true, data, error: null });
 const fail = (message) => ({ success: false, data: null, error: message });
 
@@ -34,11 +41,12 @@ const fail = (message) => ({ success: false, data: null, error: message });
  * @param {object} deps.config
  * @param {{getAccessToken: Function}} deps.tokenService
  * @param {{createCallLog: Function}} deps.callLogsClient
- * @param {{markSeen: Function, recentForPerson: Function}} deps.syncStore
+ * @param {{addNote: Function}} [deps.notesClient]
+ * @param {{markSeen: Function, recentForPerson: Function, getBySip: Function}} deps.syncStore
  * @param {{resolveCompany: Function}} [deps.apiKeyStore]
  * @param {{take: Function}} [deps.limiter]
  */
-function createCallsRouter({ config, tokenService, callLogsClient, syncStore, apiKeyStore, limiter }) {
+function createCallsRouter({ config, tokenService, callLogsClient, notesClient, syncStore, apiKeyStore, limiter }) {
   const router = express.Router();
   const jwtSecret = config.pipedrive.jwtSecret || config.pipedrive.clientSecret;
   router.use(createApiGuard({ jwtSecret, apiKeyStore, limiter }));
@@ -94,6 +102,42 @@ function createCallsRouter({ config, tokenService, callLogsClient, syncStore, ap
       return res.json(ok({ calls }));
     } catch {
       return res.status(502).json(fail('Could not load recent calls'));
+    }
+  });
+
+  // Late note back-fill: a note saved in the softphone after the call was logged.
+  // Call logs have no update API, so the note is attached as a Note on the linked
+  // person. Reconciled by SIP Call-ID against the real-time / sync ledger row.
+  router.post('/note', validateBody(noteBodySchema), async (req, res) => {
+    if (!notesClient) {
+      return res.status(501).json(fail('Notes are not enabled'));
+    }
+    const { companyId } = req.ivrIdentity;
+    const sipCallId = String(req.body.sipCallId).trim();
+    try {
+      const row = await syncStore.getBySip(companyId, sipCallId);
+      if (!row) {
+        // The call may not be logged yet (sync runs every 30s); the agent can retry.
+        return res.status(404).json(fail('No logged call found for this call yet'));
+      }
+      if (!row.personId) {
+        // Nothing to attach the note to (call not linked to a person).
+        return res.json(ok({ applied: false, reason: 'no_linked_person' }));
+      }
+      const content = buildLateNoteContent({ note: req.body.note, pbxCallId: row.pbxCallId });
+      if (!content) {
+        return res.status(400).json(fail('Note is empty'));
+      }
+      const { accessToken, apiDomain } = await tokenService.getAccessToken(companyId);
+      const created = await notesClient.addNote(apiDomain, accessToken, {
+        content,
+        personId: row.personId,
+      });
+      return res.json(ok({ applied: true, noteId: created && created.id }));
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Late note back-fill failed:', err.message);
+      return res.status(502).json(fail('Could not save the note'));
     }
   });
 

@@ -18,18 +18,26 @@ function sign(payload) {
   return `${head}.${body}.${sig}`;
 }
 
-function buildHarness() {
+function buildHarness({ bySip = { pbxCallId: 'rt-1', pdCallLogId: 'log-1', personId: 55 } } = {}) {
   const created = [];
   const marked = [];
+  const notes = [];
   const callLogsClient = {
     createCallLog: async (apiDomain, token, payload) => {
       created.push(payload);
       return { id: 'rt-1' };
     },
   };
+  const notesClient = {
+    addNote: async (apiDomain, token, note) => {
+      notes.push(note);
+      return { id: 'note-1' };
+    },
+  };
   const tokenService = { getAccessToken: async () => ({ accessToken: 'AT', apiDomain: 'https://acme.pipedrive.com' }) };
   const syncStore = {
     markSeen: async (companyId, entry) => marked.push(entry),
+    getBySip: async () => bySip,
     recentForPerson: async () => [
       { pbxCallId: '101', recordingUrl: 'https://rec/1.wav', source: 'sync', createdAt: '2026-06-02T10:00:00Z' },
     ],
@@ -37,8 +45,8 @@ function buildHarness() {
   const config = { pipedrive: { jwtSecret: JWT_SECRET } };
   const app = express();
   app.use(express.json());
-  app.use('/api/calls', createCallsRouter({ config, tokenService, callLogsClient, syncStore }));
-  return { app, created, marked };
+  app.use('/api/calls', createCallsRouter({ config, tokenService, callLogsClient, notesClient, syncStore }));
+  return { app, created, marked, notes };
 }
 
 function listen(app) {
@@ -139,6 +147,86 @@ test('GET /api/calls/recent requires a personId', async () => {
     const token = sign({ companyId: 9001, exp: 9999999999 });
     const res = await fetch(`http://localhost:${port}/api/calls/recent`, {
       headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(res.status, 400);
+  } finally {
+    server.close();
+  }
+});
+
+test('POST /api/calls/note back-fills a note onto the linked person', async () => {
+  const { app, notes } = buildHarness();
+  const server = await listen(app);
+  const { port } = server.address();
+  try {
+    const token = sign({ companyId: 9001, exp: 9999999999 });
+    const res = await fetch(`http://localhost:${port}/api/calls/note`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sipCallId: 'sip-xyz', note: 'Call back Monday' }),
+    });
+    const body = await res.json();
+    assert.equal(res.status, 200);
+    assert.equal(body.data.applied, true);
+    assert.equal(body.data.noteId, 'note-1');
+    assert.equal(notes.length, 1);
+    assert.equal(notes[0].personId, 55);
+    assert.match(notes[0].content, /Call back Monday/);
+    assert.match(notes[0].content, /PBX Call Id: rt-1/);
+  } finally {
+    server.close();
+  }
+});
+
+test('POST /api/calls/note returns 404 when the call is not logged yet', async () => {
+  const { app, notes } = buildHarness({ bySip: null });
+  const server = await listen(app);
+  const { port } = server.address();
+  try {
+    const token = sign({ companyId: 9001, exp: 9999999999 });
+    const res = await fetch(`http://localhost:${port}/api/calls/note`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sipCallId: 'sip-unknown', note: 'hi' }),
+    });
+    assert.equal(res.status, 404);
+    assert.equal(notes.length, 0);
+  } finally {
+    server.close();
+  }
+});
+
+test('POST /api/calls/note skips (applied:false) when the call has no linked person', async () => {
+  const { app, notes } = buildHarness({ bySip: { pbxCallId: 'rt-2', pdCallLogId: 'log-2', personId: null } });
+  const server = await listen(app);
+  const { port } = server.address();
+  try {
+    const token = sign({ companyId: 9001, exp: 9999999999 });
+    const res = await fetch(`http://localhost:${port}/api/calls/note`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sipCallId: 'sip-xyz', note: 'orphan note' }),
+    });
+    const body = await res.json();
+    assert.equal(res.status, 200);
+    assert.equal(body.data.applied, false);
+    assert.equal(body.data.reason, 'no_linked_person');
+    assert.equal(notes.length, 0);
+  } finally {
+    server.close();
+  }
+});
+
+test('POST /api/calls/note requires a note', async () => {
+  const { app } = buildHarness();
+  const server = await listen(app);
+  const { port } = server.address();
+  try {
+    const token = sign({ companyId: 9001, exp: 9999999999 });
+    const res = await fetch(`http://localhost:${port}/api/calls/note`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sipCallId: 'sip-xyz' }),
     });
     assert.equal(res.status, 400);
   } finally {

@@ -80,6 +80,12 @@ if (!TEST_DB) {
     const bySip = await syncStore.getRealtimeBySip(CO, ['sip-1']);
     assert.equal(bySip.size, 0, 'source=sync is not a realtime row');
 
+    // getBySip powers the late-note back-fill (any source, latest row).
+    const row = await syncStore.getBySip(CO, 'sip-1');
+    assert.equal(String(row.personId), '55'); // BIGINT comes back as a string from pg
+    assert.equal(row.pbxCallId, 'rec-1');
+    assert.equal(await syncStore.getBySip(CO, 'nope'), null);
+
     await syncStore.markRecordingAttached(CO, 'sip-1', { recordingUrl: 'https://r/1.wav', attached: true });
     const recents = await syncStore.recentForPerson(CO, 55);
     assert.equal(recents[0].recordingUrl, 'https://r/1.wav');

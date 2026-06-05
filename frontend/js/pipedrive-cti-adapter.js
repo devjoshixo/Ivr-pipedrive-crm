@@ -11,6 +11,7 @@
  *   { type: 'IVR_INCOMING_CALL', number }
  *   { type: 'IVR_CALL_CONNECTED', number, direction }   direction: 'inbound' | 'outbound'
  *   { type: 'IVR_SAVE_CONTACT', number }
+ *   { type: 'IVR_NOTE_SAVED', sipCallId, note }          late note for an already-logged call
  *
  * Host -> softphone commands:
  *   { action: 'IVR_DIAL', number }
@@ -30,6 +31,9 @@
   var promptTimer = null;
   // Tracks the active call so IVR_CALL_ENDED can carry duration + SIP id.
   var activeCall = null;
+  // SIP id of the most recently ended call, so a note saved just after the call
+  // (when activeCall is already cleared) can still be tied to the right record.
+  var lastSipCallId = null;
 
   function toHost(message) {
     if (window.parent && window.parent !== window) {
@@ -114,11 +118,12 @@
     try {
       if (!activeCall) return;
       var durationSec = Math.max(0, Math.round((Date.now() - activeCall.startedAt) / 1000));
+      lastSipCallId = activeCall.sipCallId || sipIdFromSession(session);
       toHost({
         type: 'IVR_CALL_ENDED',
         number: activeCall.number,
         direction: activeCall.direction,
-        sipCallId: activeCall.sipCallId || sipIdFromSession(session),
+        sipCallId: lastSipCallId,
         durationSec: durationSec,
         startTime: new Date(activeCall.startedAt).toISOString(),
       });
@@ -127,6 +132,20 @@
     } finally {
       activeCall = null;
     }
+  };
+
+  // Late note hook. The softphone's per-call note UI should call this when the agent
+  // saves a note; it forwards the note to the host, which back-fills it onto the
+  // person linked to the (already-logged) call. Pass the SIP Call-ID when known;
+  // otherwise it falls back to the active/most-recent call.
+  // TODO(verify in-product): wire this to the Browser-Phone note-save control (the
+  // exact global/CDR-comment hook differs by build).
+  window.IVR_saveNote = function (note, sipCallId) {
+    var text = note == null ? '' : String(note).trim();
+    if (!text) return;
+    var id = sipCallId || (activeCall && activeCall.sipCallId) || lastSipCallId;
+    if (!id) return;
+    toHost({ type: 'IVR_NOTE_SAVED', sipCallId: id, note: text });
   };
 
   // --- 5-second "Save contact?" prompt for unknown inbound callers ---------
