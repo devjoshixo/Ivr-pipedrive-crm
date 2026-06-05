@@ -15,7 +15,7 @@ last commit `8fb7da6`.
 |---|---|
 | ngrok (static) | `https://prepositional-scleroblastic-ahmed.ngrok-free.dev` → localhost:3000 |
 | Backend | Node/Express on `:3000` (run detached) |
-| Postgres | Docker `ivr-pg`, **host port 5433** (volume preserved; `.env` DATABASE_URL points here) |
+| Database | **Production MariaDB** (FoundersCart, `202.133.74.249:3306/founderscart`), tables prefixed `pipedrive_`. `.env` `DATABASE_URL` + `DB_TABLE_PREFIX=pipedrive_`. (Old local `ivr-pg` Postgres is retired.) |
 | Connected company | `19733254` (devjoshi-sandbox, user 31751199 "Dev Joshi") |
 | Pipedrive app | private app, client_id `bfcb7699e1b9e7ee` (secret in `.env`) |
 | c2c mapping set | user 31751199 → DID `+918044475500`, ext **5105** |
@@ -24,7 +24,7 @@ last commit `8fb7da6`.
 ### Bring it back up after a reboot/sleep
 ```bash
 cd /mnt/data/Code/Office/Pipedrive
-docker start ivr-pg                                   # if stopped
+# DB is the remote production MariaDB now (no local container to start)
 setsid bash -c 'node backend/src/server.js > /tmp/ivr-srv.log 2>&1' </dev/null & disown
 setsid bash -c 'ngrok http --url=https://prepositional-scleroblastic-ahmed.ngrok-free.dev 3000 > /tmp/ngrok.out 2>&1' </dev/null & disown
 ```
@@ -48,7 +48,13 @@ node -e 'const c=require("crypto");const e=o=>Buffer.from(JSON.stringify(o)).toS
 - Team API: per-company **API keys** (X-Api-Key) + **rate limiting** + **Zod validation**
 - DID/extension→user mapping (page + folded into Settings)
 - App **uninstall** cleanup (`DELETE /oauth/callback`) + **dark theme**
-- Deploy: Dockerfile + docker-compose + CI (test/db-tests/docker-build). 148 tests + 5 DB tests.
+- **Late-note back-fill**: note saved after a call is logged → attached as a Note on the
+  linked person (`POST /api/calls/note`, reconciled by SIP id). softphone adapter exposes
+  `window.IVR_saveNote(note, sipCallId)` — wire it to the softphone's note control in-product.
+- **Database: MariaDB/MySQL** (ported off Postgres). Tables prefixed `pipedrive_`, live on the
+  shared production FoundersCart DB. `npm run migrate` is idempotent + prefix-aware.
+- Dashboard folded into Settings (sync status / stats / run-sync / API key).
+- Deploy: Dockerfile + docker-compose (mariadb) + CI (test/db-tests×2/docker-build). 156 tests + 5 DB tests.
 
 ## REMAINING
 
@@ -61,24 +67,14 @@ node -e 'const c=require("crypto");const e=o=>Buffer.from(JSON.stringify(o)).toS
 - [ ] softphone WebRTC-dial context passing (the panel "Softphone" button) (softphone-host.js)
 - [ ] panel record-id param (`personIdFromSearch`) (panel-context.mjs) — confirm Pipedrive's param name
 
-### 3. UI decision
-- [ ] **Dashboard reachability**: `dashboard.html` (sync status / stats / API key / run-sync) has no
-      Pipedrive entry point. Recommend folding those sections into the Settings page (already
-      reachable, already has token + mapping). Not yet done — awaiting go-ahead.
-
-### 4. Optional feature (not decided)
-- [ ] **Late-note back-fill**: notes typed after a call don't reach an already-logged call.
-      Fix = softphone emits note-saved → backend updates the activity note (we store
-      pd_call_log_id by sip_call_id). User hasn't said yes/no.
-
-### 5. Dev Hub (user actions)
+### 3. Dev Hub (user actions)
 - [ ] Register **Custom Panel** (`/panel.html`, Person details) so the recording panel + Call
       button appear. Floating window + settings already registered.
 
-### 6. Go public (decided: PUBLIC Marketplace)
+### 4. Go public (decided: PUBLIC Marketplace)
 See `docs/MARKETPLACE.md` (checklist, scope justification, listing copy, data-handling summary)
 and `docs/PRIVACY.md` (privacy draft).
-- [ ] Host off ngrok: stable HTTPS + managed Postgres (compose ready); update Dev Hub URLs.
+- [ ] Host off ngrok: stable HTTPS (the production MariaDB is already live); update Dev Hub URLs.
 - [ ] Real IVR token (not the dev test token).
 - [ ] Listing assets: icon, 3–5 screenshots, support contact, ToS + pricing URLs, hosted privacy policy.
 - [ ] Demo video + test account, then **Send to review** (Pipedrive ~1–3 wk), then publish.
