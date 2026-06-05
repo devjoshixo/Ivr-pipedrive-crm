@@ -1,35 +1,37 @@
-# Local / single-host deployment: Postgres + the integration backend.
+# Local / single-host deployment: MariaDB + the integration backend.
 # Secrets come from .env (copy .env.example -> .env); DATABASE_URL is overridden
-# here to point at the compose Postgres service.
+# here to point at the compose MariaDB service.
 services:
-  postgres:
-    image: postgres:16-alpine
+  mariadb:
+    image: mariadb:10.6
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: ivr_pipedrive
+      MARIADB_ROOT_PASSWORD: rootpw
+      MARIADB_DATABASE: ivr_pipedrive
+      MARIADB_USER: user
+      MARIADB_PASSWORD: password
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - mariadata:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d ivr_pipedrive"]
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 15
 
   app:
     build: .
     env_file: .env
     environment:
-      DATABASE_URL: postgres://user:password@postgres:5432/ivr_pipedrive
+      DATABASE_URL: mysql://user:password@mariadb:3306/ivr_pipedrive
+      DB_TABLE_PREFIX: pipedrive_
       PORT: "3000"
       NODE_ENV: production
     ports:
       - "3000:3000"
     depends_on:
-      postgres:
+      mariadb:
         condition: service_healthy
     # Apply the schema, then start the server.
     command: sh -c "node backend/src/db/migrate.js && node backend/src/server.js"
 
 volumes:
-  pgdata:
+  mariadata:

@@ -10,7 +10,7 @@ See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for decisions, the Pipedrive platform
 ## Status
 
 **Milestone 1 — IVR token validation slice (done).** Settings page → backend proxy →
-`POST /api/key_authentication` → green check. Token sealed (AES-256-GCM) in Postgres.
+`POST /api/key_authentication` → green check. Token sealed (AES-256-GCM) in MariaDB/MySQL.
 
 **Milestone 2 — Pipedrive OAuth (done).** Authorization-code flow with signed-state CSRF
 protection and transparent refresh-token rotation (60-day sliding expiry):
@@ -50,7 +50,7 @@ from `POST /v1/all_call_logs` that backfills missed calls, idempotent via app-si
 - `backend/src/sync/scheduler.js` — 15-min cadence over all connected companies.
 - `GET /api/sync/status` + `POST /api/sync/run` — for the setup dashboard (SDK-JWT auth).
 
-Verified live end-to-end against the real IVR API + Postgres (Pipedrive push stubbed):
+Verified live end-to-end against the real IVR API + MariaDB (Pipedrive push stubbed):
 first run created 60 call logs across all 3 categories and fired the saturation warning;
 second run deduped to 0 with cursors advanced.
 
@@ -101,7 +101,7 @@ record-id param) — marked `TODO(verify in-product)` in the frontend modules.
 ## Layout
 
 ```
-backend/   Node.js + Express + Postgres API (OAuth, IVR proxy, sync cron)
+backend/   Node.js + Express + MariaDB/MySQL API (OAuth, IVR proxy, sync cron)
 frontend/  Pipedrive Custom UI iframes (settings, floating-window softphone host, panel)
 ```
 

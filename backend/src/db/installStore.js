@@ -4,12 +4,16 @@
 // before it ever touches the database and decrypted only in memory when needed.
 
 const { encrypt, decrypt } = require('../crypto');
+const { tableNames } = require('./tables');
 
 /**
- * @param {import('pg').Pool} pool
+ * @param {{query: Function}} pool
  * @param {Buffer} tokenEncKey
+ * @param {ReturnType<typeof tableNames>} [tables]
  */
-function createInstallStore(pool, tokenEncKey) {
+function createInstallStore(pool, tokenEncKey, tables = tableNames()) {
+  const T = tables.installs;
+
   /**
    * Store (or replace) the IVR token for a company, sealed at rest.
    * @param {string} companyId
@@ -19,13 +23,13 @@ function createInstallStore(pool, tokenEncKey) {
   async function saveIvrToken(companyId, ivrToken, valid) {
     const sealed = encrypt(ivrToken, tokenEncKey);
     await pool.query(
-      `INSERT INTO installs (company_id, ivr_token_sealed, ivr_token_valid, updated_at)
+      `INSERT INTO ${T} (company_id, ivr_token_sealed, ivr_token_valid, updated_at)
        VALUES ($1, $2, $3, now())
-       ON CONFLICT (company_id)
-       DO UPDATE SET ivr_token_sealed = EXCLUDED.ivr_token_sealed,
-                     ivr_token_valid  = EXCLUDED.ivr_token_valid,
-                     updated_at       = now()`,
-      [companyId, sealed, valid]
+       ON DUPLICATE KEY UPDATE
+         ivr_token_sealed = VALUES(ivr_token_sealed),
+         ivr_token_valid  = VALUES(ivr_token_valid),
+         updated_at       = now()`,
+      [companyId, sealed, valid ? 1 : 0]
     );
   }
 
@@ -36,7 +40,7 @@ function createInstallStore(pool, tokenEncKey) {
    */
   async function getIvrToken(companyId) {
     const { rows } = await pool.query(
-      'SELECT ivr_token_sealed FROM installs WHERE company_id = $1',
+      `SELECT ivr_token_sealed FROM ${T} WHERE company_id = $1`,
       [companyId]
     );
     if (rows.length === 0 || !rows[0].ivr_token_sealed) return null;
@@ -56,18 +60,18 @@ function createInstallStore(pool, tokenEncKey) {
    */
   async function savePipedriveTokens(companyId, t) {
     await pool.query(
-      `INSERT INTO installs
+      `INSERT INTO ${T}
          (company_id, company_domain, pd_api_domain, pd_access_token,
           pd_refresh_token, pd_scope, pd_token_expires_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, now())
-       ON CONFLICT (company_id)
-       DO UPDATE SET company_domain      = COALESCE(EXCLUDED.company_domain, installs.company_domain),
-                     pd_api_domain       = EXCLUDED.pd_api_domain,
-                     pd_access_token     = EXCLUDED.pd_access_token,
-                     pd_refresh_token    = EXCLUDED.pd_refresh_token,
-                     pd_scope            = EXCLUDED.pd_scope,
-                     pd_token_expires_at = EXCLUDED.pd_token_expires_at,
-                     updated_at          = now()`,
+       ON DUPLICATE KEY UPDATE
+         company_domain      = COALESCE(VALUES(company_domain), company_domain),
+         pd_api_domain       = VALUES(pd_api_domain),
+         pd_access_token     = VALUES(pd_access_token),
+         pd_refresh_token    = VALUES(pd_refresh_token),
+         pd_scope            = VALUES(pd_scope),
+         pd_token_expires_at = VALUES(pd_token_expires_at),
+         updated_at          = now()`,
       [
         companyId,
         t.companyDomain ?? null,
@@ -86,7 +90,7 @@ function createInstallStore(pool, tokenEncKey) {
    * @returns {Promise<object|null>}
    */
   async function getInstall(companyId) {
-    const { rows } = await pool.query('SELECT * FROM installs WHERE company_id = $1', [companyId]);
+    const { rows } = await pool.query(`SELECT * FROM ${T} WHERE company_id = $1`, [companyId]);
     return rows[0] || null;
   }
 
@@ -96,7 +100,7 @@ function createInstallStore(pool, tokenEncKey) {
    * @param {string} companyId
    */
   async function deleteCompany(companyId) {
-    await pool.query('DELETE FROM installs WHERE company_id = $1', [companyId]);
+    await pool.query(`DELETE FROM ${T} WHERE company_id = $1`, [companyId]);
   }
 
   /**
@@ -106,7 +110,7 @@ function createInstallStore(pool, tokenEncKey) {
    */
   async function listConnectedCompanyIds() {
     const { rows } = await pool.query(
-      `SELECT company_id FROM installs
+      `SELECT company_id FROM ${T}
        WHERE ivr_token_sealed IS NOT NULL AND pd_refresh_token IS NOT NULL`
     );
     return rows.map((r) => r.company_id);

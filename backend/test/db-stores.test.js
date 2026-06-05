@@ -1,8 +1,9 @@
 'use strict';
 
-// Integration tests for the DB stores against a real Postgres. They run only when
-// TEST_DATABASE_URL is set (point it at a throwaway database); otherwise they skip,
-// so the default `npm test` and CI stay database-free.
+// Integration tests for the DB stores against a real MariaDB/MySQL. They run only
+// when TEST_DATABASE_URL is set (point it at a throwaway database); otherwise they
+// skip, so the default `npm test` and CI stay database-free.
+// A TEST_DB_PREFIX may be set to exercise the table-prefix path.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -16,37 +17,44 @@ if (!TEST_DB) {
   test('db-stores (skipped — set TEST_DATABASE_URL to run)', { skip: true }, () => {});
 } else {
   // eslint-disable-next-line global-require
-  const { Pool } = require('pg');
+  const { getPool, closePool } = require('../src/db/pool');
+  const { tableNames } = require('../src/db/tables');
+  const { splitStatements } = require('../src/db/migrate');
   const { createInstallStore } = require('../src/db/installStore');
   const { createSyncStore } = require('../src/db/syncStore');
   const { createMappingStore } = require('../src/db/mappingStore');
   const { createApiKeyStore } = require('../src/db/apiKeyStore');
 
-  const pool = new Pool({ connectionString: TEST_DB });
+  const PREFIX = process.env.TEST_DB_PREFIX || '';
+  const pool = getPool(TEST_DB);
+  const tables = tableNames(PREFIX);
   const encKey = crypto.randomBytes(32);
   const CO = `test-${crypto.randomBytes(4).toString('hex')}`;
 
-  const installStore = createInstallStore(pool, encKey);
-  const syncStore = createSyncStore(pool);
-  const mappingStore = createMappingStore(pool);
-  const apiKeyStore = createApiKeyStore(pool);
+  const installStore = createInstallStore(pool, encKey, tables);
+  const syncStore = createSyncStore(pool, tables);
+  const mappingStore = createMappingStore(pool, tables);
+  const apiKeyStore = createApiKeyStore(pool, tables);
 
   test.before(async () => {
-    const schema = fs.readFileSync(path.join(__dirname, '..', 'src', 'db', 'schema.sql'), 'utf8');
-    await pool.query(schema);
+    const raw = fs.readFileSync(path.join(__dirname, '..', 'src', 'db', 'schema.sql'), 'utf8');
+    const sql = raw.replace(/\{\{PREFIX\}\}/g, PREFIX);
+    for (const statement of splitStatements(sql)) {
+      await pool.query(statement);
+    }
     // Create the install row everything else FK-references.
     await installStore.saveIvrToken(CO, 'seed', false);
   });
 
   test.after(async () => {
-    await pool.query('DELETE FROM installs WHERE company_id = $1', [CO]); // cascades
-    await pool.end();
+    await pool.query(`DELETE FROM ${tables.installs} WHERE company_id = $1`, [CO]); // cascades
+    await closePool();
   });
 
   test('installStore seals + round-trips the IVR token; plaintext not stored', async () => {
     await installStore.saveIvrToken(CO, 'super-secret-token', true);
     assert.equal(await installStore.getIvrToken(CO), 'super-secret-token');
-    const { rows } = await pool.query('SELECT ivr_token_sealed FROM installs WHERE company_id=$1', [CO]);
+    const { rows } = await pool.query(`SELECT ivr_token_sealed FROM ${tables.installs} WHERE company_id=$1`, [CO]);
     assert.ok(!rows[0].ivr_token_sealed.includes('super-secret-token'), 'stored sealed, not plaintext');
   });
 
@@ -119,7 +127,7 @@ if (!TEST_DB) {
     const meta = await apiKeyStore.getMeta(CO);
     assert.equal(meta.prefix, prefix);
     // Raw key must not be stored.
-    const { rows } = await pool.query('SELECT key_hash FROM company_api_keys WHERE company_id=$1', [CO]);
+    const { rows } = await pool.query(`SELECT key_hash FROM ${tables.apiKeys} WHERE company_id=$1`, [CO]);
     assert.notEqual(rows[0].key_hash, key);
   });
 }

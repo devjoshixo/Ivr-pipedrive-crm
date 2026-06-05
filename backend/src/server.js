@@ -59,11 +59,14 @@ function buildApp(config) {
     const { createMappingStore } = require('./db/mappingStore');
     // eslint-disable-next-line global-require
     const { createApiKeyStore } = require('./db/apiKeyStore');
+    // eslint-disable-next-line global-require
+    const { tableNames } = require('./db/tables');
     const pool = getPool(config.databaseUrl);
-    installStore = createInstallStore(pool, config.tokenEncKey);
-    syncStore = createSyncStore(pool);
-    mappingStore = createMappingStore(pool);
-    apiKeyStore = createApiKeyStore(pool);
+    const tables = tableNames(config.tablePrefix);
+    installStore = createInstallStore(pool, config.tokenEncKey, tables);
+    syncStore = createSyncStore(pool, tables);
+    mappingStore = createMappingStore(pool, tables);
+    apiKeyStore = createApiKeyStore(pool, tables);
   } catch (err) {
     // eslint-disable-next-line no-console
     console.warn('Persistence unavailable (token save + sync disabled):', err.message);

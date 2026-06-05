@@ -4,11 +4,15 @@
 // is returned exactly once at generation time for the admin to copy.
 
 const { generateApiKey, hashApiKey } = require('../apikey');
+const { tableNames } = require('./tables');
 
 /**
- * @param {import('pg').Pool} pool
+ * @param {{query: Function}} pool
+ * @param {ReturnType<typeof tableNames>} [tables]
  */
-function createApiKeyStore(pool) {
+function createApiKeyStore(pool, tables = tableNames()) {
+  const T = tables.apiKeys;
+
   /**
    * Generate (or replace) the company's API key. Returns the raw key once.
    * @returns {Promise<{key: string, prefix: string}>}
@@ -16,11 +20,10 @@ function createApiKeyStore(pool) {
   async function regenerate(companyId) {
     const { key, hash, prefix } = generateApiKey();
     await pool.query(
-      `INSERT INTO company_api_keys (company_id, key_hash, key_prefix, created_at, last_used_at)
+      `INSERT INTO ${T} (company_id, key_hash, key_prefix, created_at, last_used_at)
        VALUES ($1, $2, $3, now(), NULL)
-       ON CONFLICT (company_id)
-       DO UPDATE SET key_hash = EXCLUDED.key_hash, key_prefix = EXCLUDED.key_prefix,
-                     created_at = now(), last_used_at = NULL`,
+       ON DUPLICATE KEY UPDATE key_hash = VALUES(key_hash), key_prefix = VALUES(key_prefix),
+                               created_at = now(), last_used_at = NULL`,
       [companyId, hash, prefix]
     );
     return { key, prefix };
@@ -35,12 +38,12 @@ function createApiKeyStore(pool) {
     if (!key) return null;
     const hash = hashApiKey(key);
     const { rows } = await pool.query(
-      'SELECT company_id FROM company_api_keys WHERE key_hash = $1',
+      `SELECT company_id FROM ${T} WHERE key_hash = $1`,
       [hash]
     );
     if (!rows[0]) return null;
     pool
-      .query('UPDATE company_api_keys SET last_used_at = now() WHERE key_hash = $1', [hash])
+      .query(`UPDATE ${T} SET last_used_at = now() WHERE key_hash = $1`, [hash])
       .catch(() => {});
     return rows[0].company_id;
   }
@@ -48,7 +51,7 @@ function createApiKeyStore(pool) {
   /** Non-secret metadata for the dashboard (prefix + timestamps). */
   async function getMeta(companyId) {
     const { rows } = await pool.query(
-      'SELECT key_prefix, created_at, last_used_at FROM company_api_keys WHERE company_id = $1',
+      `SELECT key_prefix, created_at, last_used_at FROM ${T} WHERE company_id = $1`,
       [companyId]
     );
     return rows[0]

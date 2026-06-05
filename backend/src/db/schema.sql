@@ -1,71 +1,80 @@
--- IVRSolutions Pipedrive integration — Postgres schema.
+-- IVRSolutions Pipedrive integration — MariaDB/MySQL schema.
+-- `{{PREFIX}}` is replaced by migrate.js with DB_TABLE_PREFIX (e.g. `pipedrive_`) so
+-- the app's tables live in their own namespace inside a shared database.
 -- One row per installed Pipedrive company (keyed by company_id from OAuth).
 
 -- Installed companies: holds OAuth tokens + the encrypted IVR API token.
-CREATE TABLE IF NOT EXISTS installs (
-  company_id            TEXT PRIMARY KEY,           -- Pipedrive company id
-  company_domain        TEXT,                       -- e.g. acme.pipedrive.com
-  pd_access_token       TEXT,                       -- Pipedrive OAuth access token (milestone 2)
-  pd_refresh_token      TEXT,                       -- expires after 60 days of inactivity
-  pd_token_expires_at   TIMESTAMPTZ,
-  ivr_token_sealed      TEXT,                       -- AES-256-GCM sealed IVR API token
-  ivr_token_valid       BOOLEAN NOT NULL DEFAULT FALSE,
-  created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
--- Added in milestone 2 (idempotent so re-running migrate upgrades an existing table).
-ALTER TABLE installs ADD COLUMN IF NOT EXISTS pd_api_domain TEXT;
-ALTER TABLE installs ADD COLUMN IF NOT EXISTS pd_scope TEXT;
-ALTER TABLE installs ADD COLUMN IF NOT EXISTS company_name TEXT;
+CREATE TABLE IF NOT EXISTS {{PREFIX}}installs (
+  company_id            VARCHAR(191) NOT NULL,           -- Pipedrive company id
+  company_domain        VARCHAR(255),                    -- e.g. acme.pipedrive.com
+  pd_api_domain         VARCHAR(255),                    -- e.g. https://acme.pipedrive.com
+  pd_access_token       TEXT,                            -- Pipedrive OAuth access token
+  pd_refresh_token      TEXT,                            -- expires after 60 days of inactivity
+  pd_token_expires_at   DATETIME NULL,
+  pd_scope              TEXT,
+  company_name          VARCHAR(255),
+  ivr_token_sealed      TEXT,                            -- AES-256-GCM sealed IVR API token
+  ivr_token_valid       TINYINT(1) NOT NULL DEFAULT 0,
+  created_at            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (company_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Sync cursors: 3 categories per the IVR all_call_logs API (newest-first, 20/category cap).
-CREATE TABLE IF NOT EXISTS sync_state (
-  company_id            TEXT PRIMARY KEY REFERENCES installs(company_id) ON DELETE CASCADE,
-  last_call_log_id      TEXT NOT NULL DEFAULT '',
-  last_c2c_log_id       TEXT NOT NULL DEFAULT '',
-  last_dialer_log_id    TEXT NOT NULL DEFAULT '',
-  last_sync_at          TIMESTAMPTZ,
-  last_error            TEXT,                        -- includes saturation WARN (>=20/category)
-  last_error_at         TIMESTAMPTZ
-);
+CREATE TABLE IF NOT EXISTS {{PREFIX}}sync_state (
+  company_id            VARCHAR(191) NOT NULL,
+  last_call_log_id      VARCHAR(191) NOT NULL DEFAULT '',
+  last_c2c_log_id       VARCHAR(191) NOT NULL DEFAULT '',
+  last_dialer_log_id    VARCHAR(191) NOT NULL DEFAULT '',
+  last_sync_at          DATETIME NULL,
+  last_error            TEXT,                            -- includes saturation WARN (>=20/category)
+  last_error_at         DATETIME NULL,
+  PRIMARY KEY (company_id),
+  CONSTRAINT fk_{{PREFIX}}sync_company FOREIGN KEY (company_id)
+    REFERENCES {{PREFIX}}installs(company_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Per-company API key for server-to-server access (only the hash is stored).
-CREATE TABLE IF NOT EXISTS company_api_keys (
-  company_id            TEXT PRIMARY KEY REFERENCES installs(company_id) ON DELETE CASCADE,
-  key_hash              TEXT NOT NULL,
-  key_prefix            TEXT NOT NULL,
-  created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
-  last_used_at          TIMESTAMPTZ
-);
-CREATE INDEX IF NOT EXISTS company_api_keys_hash_idx ON company_api_keys (key_hash);
+CREATE TABLE IF NOT EXISTS {{PREFIX}}company_api_keys (
+  company_id            VARCHAR(191) NOT NULL,
+  key_hash              VARCHAR(191) NOT NULL,
+  key_prefix            VARCHAR(64) NOT NULL,
+  created_at            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_used_at          DATETIME NULL,
+  PRIMARY KEY (company_id),
+  KEY {{PREFIX}}api_keys_hash_idx (key_hash),
+  CONSTRAINT fk_{{PREFIX}}apikey_company FOREIGN KEY (company_id)
+    REFERENCES {{PREFIX}}installs(company_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- DID + extension -> Pipedrive user mapping (click-to-call routing + call ownership).
-CREATE TABLE IF NOT EXISTS user_mappings (
-  company_id            TEXT NOT NULL REFERENCES installs(company_id) ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS {{PREFIX}}user_mappings (
+  company_id            VARCHAR(191) NOT NULL,
   pd_user_id            BIGINT NOT NULL,
-  did                   TEXT,
-  extension             TEXT,
-  updated_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (company_id, pd_user_id)
-);
+  did                   VARCHAR(64),
+  extension             VARCHAR(64),
+  updated_at            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (company_id, pd_user_id),
+  CONSTRAINT fk_{{PREFIX}}map_company FOREIGN KEY (company_id)
+    REFERENCES {{PREFIX}}installs(company_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- App-side dedupe ledger: Pipedrive custom fields can't enforce uniqueness, so we
--- track which PBX call ids have been logged. Unique on (company_id, pbx_call_id).
-CREATE TABLE IF NOT EXISTS synced_calls (
-  company_id            TEXT NOT NULL REFERENCES installs(company_id) ON DELETE CASCADE,
-  pbx_call_id           TEXT NOT NULL,               -- recordid (or c2c-/dialer-/rt- prefixed)
-  pd_call_log_id        TEXT,                        -- Pipedrive callLog id once created
+-- App-side dedupe ledger: which PBX call ids have been logged (unique per company).
+-- The SIP Call-ID is the cross-path key: a real-time row (source='realtime') is later
+-- matched by the sync via sip_call_id so the sync attaches the recording (and late
+-- notes resolve to the linked person) instead of duplicating.
+CREATE TABLE IF NOT EXISTS {{PREFIX}}synced_calls (
+  company_id            VARCHAR(191) NOT NULL,
+  pbx_call_id           VARCHAR(191) NOT NULL,           -- recordid (or c2c-/dialer-/rt- prefixed)
+  pd_call_log_id        VARCHAR(191),                    -- Pipedrive callLog id once created
   pd_person_id          BIGINT,
-  created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (company_id, pbx_call_id)
-);
-
--- Added in milestone 6 (real-time logging + recording reconciliation). The SIP Call-ID
--- is the cross-path key: a real-time row (source='realtime') is later matched by the
--- sync via sip_call_id so the sync attaches the recording instead of duplicating.
-ALTER TABLE synced_calls ADD COLUMN IF NOT EXISTS sip_call_id        TEXT;
-ALTER TABLE synced_calls ADD COLUMN IF NOT EXISTS recording_url      TEXT;
-ALTER TABLE synced_calls ADD COLUMN IF NOT EXISTS recording_attached BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE synced_calls ADD COLUMN IF NOT EXISTS source             TEXT;  -- 'realtime' | 'sync'
-CREATE INDEX IF NOT EXISTS synced_calls_sip_idx ON synced_calls (company_id, sip_call_id);
+  sip_call_id           VARCHAR(191),
+  recording_url         TEXT,
+  recording_attached    TINYINT(1) NOT NULL DEFAULT 0,
+  source                VARCHAR(32),                     -- 'realtime' | 'sync'
+  created_at            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (company_id, pbx_call_id),
+  KEY {{PREFIX}}synced_calls_sip_idx (company_id, sip_call_id),
+  CONSTRAINT fk_{{PREFIX}}calls_company FOREIGN KEY (company_id)
+    REFERENCES {{PREFIX}}installs(company_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

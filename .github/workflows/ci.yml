@@ -22,16 +22,15 @@ jobs:
   db-tests:
     runs-on: ubuntu-latest
     services:
-      postgres:
-        image: postgres:16-alpine
+      mariadb:
+        image: mariadb:10.6
         env:
-          POSTGRES_USER: user
-          POSTGRES_PASSWORD: password
-          POSTGRES_DB: ivr_pipedrive_test
-        ports: ['5432:5432']
+          MARIADB_ROOT_PASSWORD: password
+          MARIADB_DATABASE: ivr_pipedrive_test
+        ports: ['3306:3306']
         options: >-
-          --health-cmd "pg_isready -U user -d ivr_pipedrive_test"
-          --health-interval 5s --health-timeout 5s --health-retries 10
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 5s --health-timeout 5s --health-retries 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -40,9 +39,14 @@ jobs:
           cache: npm
       - run: npm ci
       # Full suite incl. the DB-store integration tests (TEST_DATABASE_URL set).
+      # Run once plain and once with the table prefix to cover both code paths.
       - run: npm test
         env:
-          TEST_DATABASE_URL: postgres://user:password@localhost:5432/ivr_pipedrive_test
+          TEST_DATABASE_URL: mysql://root:password@127.0.0.1:3306/ivr_pipedrive_test
+      - run: npm run test:db
+        env:
+          TEST_DATABASE_URL: mysql://root:password@127.0.0.1:3306/ivr_pipedrive_test
+          TEST_DB_PREFIX: pipedrive_
 
   docker-build:
     runs-on: ubuntu-latest

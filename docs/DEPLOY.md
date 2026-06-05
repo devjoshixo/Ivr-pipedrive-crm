@@ -12,7 +12,8 @@ Copy `.env.example` → `.env` and set:
 
 | Var | Production value |
 |---|---|
-| `DATABASE_URL` | `postgres://<user>:<pass>@<host>:5432/<db>` — your **production Postgres** |
+| `DATABASE_URL` | `mysql://<user>:<pass>@<host>:3306/<db>` — your **production MariaDB/MySQL** (URL-encode special chars in the password) |
+| `DB_TABLE_PREFIX` | `pipedrive_` when sharing a database with other apps (keeps this app's tables namespaced); empty for a dedicated DB |
 | `IVR_TOKEN_ENC_KEY` | 32-byte hex (`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`) — **keep stable**; rotating it invalidates stored IVR tokens |
 | `PIPEDRIVE_CLIENT_ID` / `PIPEDRIVE_CLIENT_SECRET` | from the Pipedrive Developer Hub app |
 | `PIPEDRIVE_REDIRECT_URI` | `https://<DOMAIN>/oauth/callback` (must match Dev Hub exactly) |
@@ -24,12 +25,12 @@ Copy `.env.example` → `.env` and set:
 | `NODE_ENV` | `production` |
 | `PORT` | `3000` |
 
-## 2a. Deploy with Docker Compose (uses a bundled Postgres)
+## 2a. Deploy with Docker Compose (uses a bundled MariaDB)
 ```bash
 cp .env.example .env   # fill the values above
-docker compose up -d   # starts Postgres + app; app waits for DB, migrates, then serves
+docker compose up -d   # starts MariaDB + app; app waits for DB, migrates, then serves
 ```
-To use your **existing managed Postgres** instead of the bundled one: remove the `postgres`
+To use your **existing managed MariaDB/MySQL** instead of the bundled one: remove the `mariadb`
 service + `depends_on` from `docker-compose.yml`, and set `DATABASE_URL` to your managed DB.
 
 ## 2b. Deploy with bare Node
@@ -61,8 +62,10 @@ Then in Pipedrive: open Settings → paste IVR token → Save; open the softphon
 test call; confirm a call log appears.
 
 ## Notes
-- The schema is **Postgres-only**. Managed options: RDS/Aurora Postgres, Supabase, Neon,
-  DigitalOcean Managed PG, Hostinger/your own Postgres.
+- The schema targets **MariaDB 10.6+ / MySQL 8+**. Works on shared hosting MySQL
+  (e.g. Hostinger), RDS/Aurora MySQL, PlanetScale, or your own MariaDB.
+- Set `DB_TABLE_PREFIX` (e.g. `pipedrive_`) when the database is shared with other
+  apps; the migration only creates its own prefixed tables and never touches others.
 - `npm run migrate` is safe to re-run (all `CREATE TABLE IF NOT EXISTS` / idempotent).
 - Scheduler + rate limiter are in-process (single instance) — run **one** app instance
   (multi-instance was intentionally out of scope).

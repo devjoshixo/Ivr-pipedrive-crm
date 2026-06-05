@@ -36,8 +36,10 @@ function loadConfig() {
     port: Number(optional('PORT', '3000')),
     nodeEnv: optional('NODE_ENV', 'development'),
 
-    // Postgres
+    // Database (MariaDB/MySQL): mysql://user:pass@host:port/db
     databaseUrl: required('DATABASE_URL'),
+    // Prefix for this app's tables in a shared database (e.g. `pipedrive_`).
+    tablePrefix: optional('DB_TABLE_PREFIX', ''),
 
     // IVR API
     ivrBaseUrl: optional('IVR_BASE_URL', 'https://api.ivrsolutions.in'),
