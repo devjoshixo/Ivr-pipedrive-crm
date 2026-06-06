@@ -56,7 +56,14 @@ async function authedFetch(path, options = {}) {
 }
 
 // c2c click-to-call: rings the agent's softphone + cell, then bridges the customer.
+// Success is transient (the ring is happening on the phone) → show "Ringing…" and
+// auto-clear after 5s. Errors persist (red) so the agent can read what went wrong.
 async function callViaC2C(phone, statusEl) {
+  if (statusEl._clearTimer) {
+    clearTimeout(statusEl._clearTimer);
+    statusEl._clearTimer = null;
+  }
+  statusEl.style.color = '';
   statusEl.textContent = 'Calling…';
   try {
     const res = await authedFetch('/api/ivr/click-to-call', {
@@ -64,9 +71,20 @@ async function callViaC2C(phone, statusEl) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phone }),
     });
-    const body = await res.json();
-    statusEl.textContent = res.ok ? 'Ringing your phone…' : (body && body.error) || 'Call failed';
+    const body = await res.json().catch(() => null);
+    if (res.ok) {
+      statusEl.style.color = '';
+      statusEl.textContent = 'Ringing…';
+      statusEl._clearTimer = setTimeout(() => {
+        statusEl.textContent = '';
+        statusEl._clearTimer = null;
+      }, 5000);
+    } else {
+      statusEl.style.color = '#c62828';
+      statusEl.textContent = (body && body.error) || `Call failed (${res.status})`;
+    }
   } catch {
+    statusEl.style.color = '#c62828';
     statusEl.textContent = 'Backend unreachable';
   }
 }
