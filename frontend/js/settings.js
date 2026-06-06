@@ -344,9 +344,23 @@ async function init() {
   if (runBtn) runBtn.addEventListener('click', runSync);
   if (genBtn) genBtn.addEventListener('click', regenerateKey);
   loadExtensionCard();
-  loadMappings();
-  loadStatus();
-  loadApiKey();
+
+  // The mapping / sync-status / API-key sections need the SDK signed token, which only
+  // exists when the page runs INSIDE Pipedrive. On the standalone post-OAuth landing
+  // (no SDK), hide them and point the admin into Pipedrive — avoids confusing 401s.
+  const embedded = !!sdk;
+  const manage = document.getElementById('pdManage');
+  const note = document.getElementById('pdOnlyNote');
+  if (embedded) {
+    if (note) note.hidden = true;
+    if (manage) manage.style.display = '';
+    loadMappings();
+    loadStatus();
+    loadApiKey();
+  } else {
+    if (manage) manage.style.display = 'none';
+    if (note) note.hidden = false;
+  }
 }
 
 if (document.readyState === 'loading') {

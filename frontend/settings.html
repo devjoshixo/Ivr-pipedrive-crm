@@ -138,6 +138,20 @@
         backend. It is never kept in the browser or in the Pipedrive app package.
       </p>
 
+      <div id="pdOnlyNote" class="setup-card" hidden style="border-left-color:var(--ok);background:#f3faf4">
+        <div class="setup-step" style="background:var(--ok)">✓</div>
+        <div class="setup-body">
+          <h3>You're connected</h3>
+          <p style="margin:0">
+            Install the extension above, then manage <strong>DID mappings, sync status, and API
+            keys</strong> from the app's <strong>Settings inside Pipedrive</strong>
+            (Tools and apps → Marketplace apps → IVRSolutions). This standalone page only handles
+            the one-time token + extension setup.
+          </p>
+        </div>
+      </div>
+
+      <div id="pdManage">
       <h2>Click-to-call: DID &amp; extension per user</h2>
       <p class="muted">
         Assign each Pipedrive user the DID and extension to ring on click-to-call.
@@ -173,6 +187,7 @@
         for your account. Shown in full only once — copy it immediately. Regenerating
         invalidates the old key.
       </p>
+      </div><!-- /#pdManage -->
     </div>
 
     <script type="module" src="js/settings.js"></script>
