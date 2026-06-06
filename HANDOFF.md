@@ -43,7 +43,11 @@ node -e 'const c=require("crypto");const e=o=>Buffer.from(JSON.stringify(o)).toS
 - 30s sync: `/v1/all_call_logs` → Pipedrive call logs (cursor-paged, deduped, saturation warn)
 - Person match → link; unknown caller → auto **Person + Lead** (noMatchPolicy=lead)
 - Recording attach to native Call tab + recording-player panel
-- Embedded softphone floating window (login + calls work); S/M/L resize; incoming banner
+- **Softphone = companion Chrome extension** (pivoted off the Pipedrive floating window, which
+  can't arm for inbound while hidden). Extension is always-on (`tel:` click-to-dial + inbound
+  banner on every tab), published: `chromewebstore.google.com/detail/…/keffpnadhppdelceioccednhjdghmbfi`.
+  Code lives at `/mnt/data/Code/Office/Softphone-Extension/`. Settings page shows a one-time
+  "Install the Chrome extension" card (`GET /api/settings/client-config` → `CHROME_EXTENSION_URL`).
 - **Click-to-call (c2c)** — verified end-to-end (call to +919910513597, logged as `c2c-740026`)
 - Team API: per-company **API keys** (X-Api-Key) + **rate limiting** + **Zod validation**
 - DID/extension→user mapping (page + folded into Settings)
@@ -58,27 +62,29 @@ node -e 'const c=require("crypto");const e=o=>Buffer.from(JSON.stringify(o)).toS
 
 ## REMAINING
 
-### 1. Last in-product verification
-- [ ] **Inbound screen-pop** — call the DID from another phone; matching Person should open.
-      Watch `/api/cti/lookup` in the logs. Fix `REDIRECT_TO` payload if the record doesn't open.
+### 1. Deploy to production (BLOCKER: production domain)
+- [ ] Stable HTTPS domain off ngrok → point backend at it (production MariaDB already live).
+- [ ] Update Dev Hub: OAuth callback + **settings.html + panel.html** URLs (NO floating window).
+- [ ] Reconnect the sandbox on the fresh MariaDB → smoke-test OAuth + a real sync.
 
-### 2. `TODO(verify in-product)` markers (finalize after the live tests)
-- [ ] screen-pop `Command.REDIRECT_TO` payload to open ONE Person record (softphone-host.js)
-- [ ] softphone WebRTC-dial context passing (the panel "Softphone" button) (softphone-host.js)
-- [ ] panel record-id param (`personIdFromSearch`) (panel-context.mjs) — confirm Pipedrive's param name
+### 2. Extension / inbound (calling layer is now the Chrome extension)
+- [ ] (optional) True screen-pop: have the extension's inbound banner call `/api/cti/lookup` →
+      open the matching Pipedrive person URL (today it shows the number only).
+- [ ] (optional) Late-note via extension: the extension softphone posts `/api/calls/note` using
+      the per-company **X-Api-Key** (the SDK-JWT path was the old embedded softphone).
 
 ### 3. Dev Hub (user actions)
-- [ ] Register **Custom Panel** (`/panel.html`, Person details) so the recording panel + Call
-      button appear. Floating window + settings already registered.
+- [ ] Register **Custom Panel** (`/panel.html`, Person details) + **settings** page. Do NOT
+      register a floating window (softphone is the extension).
 
 ### 4. Go public (decided: PUBLIC Marketplace)
-See `docs/MARKETPLACE.md` (checklist, scope justification, listing copy, data-handling summary)
+See `docs/MARKETPLACE.md` (checklist, scope justification, listing copy — updated for the extension)
 and `docs/PRIVACY.md` (privacy draft).
-- [ ] Host off ngrok: stable HTTPS (the production MariaDB is already live); update Dev Hub URLs.
 - [ ] Real IVR token (not the dev test token).
 - [ ] Listing assets: icon, 3–5 screenshots, support contact, ToS + pricing URLs, hosted privacy policy.
 - [ ] Demo video + test account, then **Send to review** (Pipedrive ~1–3 wk), then publish.
-- NOTE: multi-instance scaling intentionally **skipped** (single instance per user's decision).
+- NOTE: listing must state the companion Chrome extension requirement; multi-instance scaling
+  intentionally **skipped** (single instance per user's decision).
 
 ## Key gotchas (don't relearn)
 - **c2c DID format**: `c2c_get` rejects E.164 `+918044475500` ("Did No. Invalid"); needs
