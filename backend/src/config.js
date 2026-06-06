@@ -25,6 +25,13 @@ function optional(name, fallback) {
   return process.env[name] ?? fallback;
 }
 
+// Like optional(), but constrained to a known set — an unrecognised value falls back
+// to the default rather than silently changing behaviour.
+function oneOf(name, allowed, fallback) {
+  const value = process.env[name] ?? fallback;
+  return allowed.includes(value) ? value : fallback;
+}
+
 /**
  * Build and validate the config object. Throws if anything required is missing or invalid.
  * @returns {object}
@@ -52,9 +59,13 @@ function loadConfig() {
       'https://chromewebstore.google.com/detail/ivr-solutions-webrtc-soft/keffpnadhppdelceioccednhjdghmbfi'
     ),
 
-    // What to do when an inbound/outbound number matches no existing Pipedrive person.
-    // 'lead' = create Person + Lead (default), 'person' = create Person, 'skip' = don't log.
-    noMatchPolicy: optional('NO_MATCH_POLICY', 'lead'),
+    // What to do when an inbound/outbound number matches no existing Pipedrive person:
+    //   'lead'     = create Person + Lead, link the call to them
+    //   'person'   = create Person, link the call to them
+    //   'floating' = log the call with no contact link (default — no CRM clutter; the
+    //                number still shows in the Calls list and is callable via the softphone)
+    //   'skip'     = don't log the call at all
+    noMatchPolicy: oneOf('NO_MATCH_POLICY', ['lead', 'person', 'floating', 'skip'], 'floating'),
 
     // How often the background poller pulls /v1/all_call_logs. Default 30s. Empty polls
     // are cheap (no Pipedrive cost); a 10s hard floor avoids hammering the IVR API.

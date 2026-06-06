@@ -297,6 +297,22 @@ test("no-match policy 'skip': does not create anything and skips the call", asyn
   assert.equal(createdPersons.length, 0);
 });
 
+test("no-match policy 'floating': logs the call with NO contact, creates nothing", async () => {
+  const { runner, created, createdPersons, createdLeads } = harness({
+    resp: ONE_CALL,
+    match: null,
+    noMatchPolicy: 'floating',
+  });
+  const summary = await runner.runForCompany('c1');
+  assert.equal(summary.created, 1, 'the call is still logged');
+  assert.equal(summary.skipped, 0, 'not skipped');
+  assert.equal(createdPersons.length, 0, 'no Person created');
+  assert.equal(createdLeads.length, 0, 'no Lead created');
+  assert.equal(created[0].person_id, undefined, 'no person link (floating)');
+  assert.equal(created[0].lead_id, undefined, 'no lead link (floating)');
+  assert.equal(created[0].to_phone_number, '9876543210', 'still carries the number for callback');
+});
+
 test('on search failure, falls through to the no-match policy (logs via a new Lead)', async () => {
   const { runner, created, createdLeads } = harness({ resp: ONE_CALL, searchThrows: true, noMatchPolicy: 'lead' });
   const summary = await runner.runForCompany('c1');

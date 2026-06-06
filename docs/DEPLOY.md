@@ -21,7 +21,7 @@ Copy `.env.example` → `.env` and set:
 | `IVR_BASE_URL` | `https://api.ivrsolutions.in` |
 | `CHROME_EXTENSION_URL` | Web Store URL of the IVR softphone extension (shown on the settings page). Defaults to the published listing. |
 | `SYNC_INTERVAL_MS` | `30000` (or as desired, floor 10000) |
-| `NO_MATCH_POLICY` | `lead` |
+| `NO_MATCH_POLICY` | `floating` — log unmatched calls with no contact (default). Other values: `person`, `lead`, `skip` |
 | `RATE_LIMIT_MAX` / `RATE_LIMIT_WINDOW_MS` | `120` / `60000` |
 | `NODE_ENV` | `production` |
 | `PORT` | `3000` |

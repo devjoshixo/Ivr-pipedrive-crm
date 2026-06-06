@@ -46,9 +46,9 @@ Items are marked: ✅ done in code · 🔧 your action (hosting/listing) · ✍�
 |---|---|
 | `users:read` | Resolve the company + owner on install; populate the DID/extension mapping. |
 | `contacts:read` | Match inbound/outbound numbers to a Person for screen-pop and call-log linking. |
-| `contacts:full` | Create a Person for an unknown caller (so the call can be logged). |
+| `contacts:full` | Create a Person for an unknown caller when the no-match policy is `person` or `lead` (the default `floating` creates nothing). |
 | `deals:read` | Associate calls with the related deal where applicable. |
-| `leads:full` | Create a Lead for an unknown caller (triage), per the no-match policy. |
+| `leads:full` | Create a Lead for an unknown caller when the no-match policy is `lead` (off by default). |
 | `activities:full` | Create/update call activities and back-fill notes. |
 | `phone-integration` | Create call logs via the CallLogs API (the core telephony feature). |
 
@@ -74,7 +74,7 @@ admin, or "search for all data" (persons/search works under `contacts:read`).
 > - **Inbound alert** — an incoming-call banner shows on every tab the moment a call arrives.
 > - **Automatic call logging** — every call becomes a Pipedrive call activity with duration,
 >   direction, and a recording link, linked to the right person.
-> - **Unknown callers → Leads** — new numbers are captured as Leads for triage.
+> - **Flexible unknown-caller handling** — unmatched calls are logged as-is by default, or optionally auto-captured as a Person or Lead.
 > - **Call recordings** — listen to recordings right on the contact's page.
 > - **Background sync** — a continuous sync logs every call, handled in any browser or device.
 >

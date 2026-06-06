@@ -35,12 +35,15 @@ function createSyncRunner({
   tokenService,
   installStore,
   syncStore,
-  noMatchPolicy = 'lead', // 'lead' | 'person' | 'skip'
+  noMatchPolicy = 'floating', // 'lead' | 'person' | 'floating' | 'skip'
   now = Date.now(),
 }) {
-  // Resolve a person/lead link for a call. Pipedrive requires every call log to be
-  // linked to something, so on no-match we apply noMatchPolicy: create a Person+Lead
-  // (default), create a Person, or skip logging the call.
+  // Resolve a person/lead link for a call. On no-match we apply noMatchPolicy:
+  //   'lead'     -> create a Person + Lead and link the call to them
+  //   'person'   -> create a Person and link the call to them
+  //   'floating' -> log the call with NO contact link (Pipedrive allows person-less
+  //                 call logs; they appear in the global Calls list — no CRM clutter)
+  //   'skip'     -> don't log the call at all
   async function resolveMatch(call, accessToken, apiDomain) {
     let match = null;
     try {
@@ -51,6 +54,8 @@ function createSyncRunner({
     }
     if (match) return match;
     if (noMatchPolicy === 'skip') return null;
+    // Empty match = "log it, link nothing" — buildCallLogPayload omits person/org/lead.
+    if (noMatchPolicy === 'floating') return {};
     try {
       const person = await personsClient.createPerson(apiDomain, accessToken, {
         name: call.customerNo,
@@ -151,8 +156,8 @@ function createSyncRunner({
           }
         }
 
-        // Pipedrive requires every call log to link to a person/org/deal/lead.
-        // Without a link (no number, or noMatchPolicy='skip'), skip rather than 400.
+        // A null match = nothing to log against (no number, policy='skip', or an
+        // auto-create that failed). 'floating' returns {} instead, so it still logs.
         if (!match) {
           skipped += 1;
           continue;
