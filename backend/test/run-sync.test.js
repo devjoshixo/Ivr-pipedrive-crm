@@ -6,11 +6,13 @@ const assert = require('node:assert/strict');
 const { createSyncRunner } = require('../src/sync/runSync');
 
 // In-memory sync store fake.
-function fakeSyncStore({ cursors = {}, seen = [], realtime = [] } = {}) {
+function fakeSyncStore({ cursors = {}, seen = [], realtime = [], intents = [] } = {}) {
   const state = {
     cursors: { lastCallLogId: '', lastC2cLogId: '', lastDialerLogId: '', ...cursors },
     seen: new Set(seen),
     realtimeBySip: new Map(realtime.map((r) => [r.sipCallId, r])),
+    intents: new Map(intents.map((i) => [i.pbxCallId, i.personId])),
+    deletedIntents: [],
     marked: [],
     attached: [],
     savedCursors: null,
@@ -19,6 +21,12 @@ function fakeSyncStore({ cursors = {}, seen = [], realtime = [] } = {}) {
   };
   return {
     state,
+    getC2cIntent: async (companyId, pbxCallId) =>
+      state.intents.has(pbxCallId) ? { personId: state.intents.get(pbxCallId) } : null,
+    deleteC2cIntent: async (companyId, pbxCallId) => {
+      state.deletedIntents.push(pbxCallId);
+      state.intents.delete(pbxCallId);
+    },
     getCursors: async () => state.cursors,
     filterSeen: async (companyId, callIds) => new Set(callIds.filter((id) => state.seen.has(id))),
     getRealtimeBySip: async (companyId, sipIds) => {
@@ -58,6 +66,7 @@ function harness({
   attachOk = true,
   failCallIds = [],
   unauthorizedCallIds = [],
+  intents = [],
 } = {}) {
   const ivrClient = { fetchAllCallLogs: async () => resp };
   const created = [];
@@ -115,7 +124,7 @@ function harness({
     },
   };
   const installStore = { getIvrToken: async () => 'ivr-token' };
-  const syncStore = fakeSyncStore({ seen, realtime });
+  const syncStore = fakeSyncStore({ seen, realtime, intents });
   const runner = createSyncRunner({
     ivrClient,
     callLogsClient,
@@ -311,6 +320,25 @@ test("no-match policy 'floating': logs the call with NO contact, creates nothing
   assert.equal(created[0].person_id, undefined, 'no person link (floating)');
   assert.equal(created[0].lead_id, undefined, 'no lead link (floating)');
   assert.equal(created[0].to_phone_number, '9876543210', 'still carries the number for callback');
+});
+
+test('c2c call uses the click-time intent (skips phone search) and clears it after', async () => {
+  const { runner, created, searchCalls, syncStore } = harness({
+    resp: {
+      call_logs: [],
+      click_to_call_logs: [
+        { recordid: '50', client_no: '9876543210', call_duration: '10', call_time: '2026-06-02T09:00:00Z' },
+      ],
+      dialer_logs: [],
+    },
+    intents: [{ pbxCallId: 'c2c-50', personId: 777 }],
+    match: { personId: 999 }, // the person a phone search WOULD return — must be ignored
+  });
+  await runner.runForCompany('c1');
+  assert.equal(created.length, 1);
+  assert.equal(created[0].person_id, 777, 'attached to the dialed-from person, not the phone-search one');
+  assert.equal(searchCalls.length, 0, 'phone search skipped when an intent exists');
+  assert.deepEqual(syncStore.state.deletedIntents, ['c2c-50'], 'intent cleared once consumed');
 });
 
 test('on search failure, falls through to the no-match policy (logs via a new Lead)', async () => {

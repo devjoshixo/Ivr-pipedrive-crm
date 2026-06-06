@@ -147,7 +147,14 @@ function createSyncRunner({
         }
 
         let match = null;
-        if (call.customerNo) {
+        // c2c calls carry the Person the agent dialed from (captured at click time).
+        // Use it directly so attribution never depends on a phone re-match; fall back
+        // to the phone search below when no intent was recorded.
+        if (call.callId && call.callId.startsWith('c2c-') && typeof syncStore.getC2cIntent === 'function') {
+          const intent = await syncStore.getC2cIntent(companyId, call.callId);
+          if (intent && intent.personId) match = { personId: intent.personId };
+        }
+        if (!match && call.customerNo) {
           if (matchCache.has(call.customerNo)) {
             match = matchCache.get(call.customerNo);
           } else {
@@ -181,6 +188,10 @@ function createSyncRunner({
           recordingAttached,
           source: 'sync',
         });
+        // The c2c intent (if any) has served its purpose now the log exists.
+        if (call.callId && call.callId.startsWith('c2c-') && typeof syncStore.deleteC2cIntent === 'function') {
+          await syncStore.deleteC2cIntent(companyId, call.callId);
+        }
         created += 1;
       } catch (err) {
         // Self-heal a revoked-but-not-expired access token: refresh once, then let

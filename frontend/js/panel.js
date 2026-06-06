@@ -58,7 +58,7 @@ async function authedFetch(path, options = {}) {
 // c2c click-to-call: rings the agent's softphone + cell, then bridges the customer.
 // Success is transient (the ring is happening on the phone) → show "Ringing…" and
 // auto-clear after 5s. Errors persist (red) so the agent can read what went wrong.
-async function callViaC2C(phone, statusEl) {
+async function callViaC2C(phone, statusEl, personId) {
   if (statusEl._clearTimer) {
     clearTimeout(statusEl._clearTimer);
     statusEl._clearTimer = null;
@@ -69,7 +69,7 @@ async function callViaC2C(phone, statusEl) {
     const res = await authedFetch('/api/ivr/click-to-call', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone }),
+      body: JSON.stringify(personId ? { phone, personId } : { phone }),
     });
     const body = await res.json().catch(() => null);
     if (res.ok) {
@@ -89,7 +89,7 @@ async function callViaC2C(phone, statusEl) {
   }
 }
 
-function renderCallButtons(person) {
+function renderCallButtons(person, personId) {
   const root = document.getElementById('callbar');
   root.innerHTML = '';
   const phones = (person && person.phones) || [];
@@ -108,7 +108,7 @@ function renderCallButtons(person) {
     call.title = 'Rings your softphone + cell, then the customer';
     const status = document.createElement('span');
     status.className = 'callstatus';
-    call.addEventListener('click', () => callViaC2C(phone, status));
+    call.addEventListener('click', () => callViaC2C(phone, status, personId));
     row.appendChild(num);
     row.appendChild(call);
     row.appendChild(status);
@@ -128,7 +128,7 @@ async function load() {
     const pRes = await authedFetch(`/api/pd/person?personId=${encodeURIComponent(personId)}`);
     if (pRes.ok) {
       const pBody = await pRes.json();
-      renderCallButtons(pBody.data ? pBody.data.person : null);
+      renderCallButtons(pBody.data ? pBody.data.person : null, personId);
     }
   } catch {
     /* leave the call bar empty */

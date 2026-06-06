@@ -79,3 +79,17 @@ CREATE TABLE IF NOT EXISTS {{PREFIX}}synced_calls (
   CONSTRAINT fk_{{PREFIX}}calls_company FOREIGN KEY (company_id)
     REFERENCES {{PREFIX}}installs(company_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Click-to-call intent: the Person the agent dialed from, captured at click time and
+-- keyed by the PBX call id ('c2c-<recordid>'). The sync uses it to attach the c2c call
+-- log to that exact Person instead of re-deriving by phone search. Normally deleted on
+-- use; a straggler (recordid never matched) is swept by the daily prune.
+CREATE TABLE IF NOT EXISTS {{PREFIX}}c2c_intents (
+  company_id    VARCHAR(191) NOT NULL,
+  pbx_call_id   VARCHAR(191) NOT NULL,           -- 'c2c-<recordid>' from the click-to-call response
+  pd_person_id  BIGINT NOT NULL,                 -- the Person the agent dialed from
+  created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (company_id, pbx_call_id),
+  CONSTRAINT fk_{{PREFIX}}c2c_company FOREIGN KEY (company_id)
+    REFERENCES {{PREFIX}}installs(company_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

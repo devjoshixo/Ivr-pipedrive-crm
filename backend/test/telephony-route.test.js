@@ -42,12 +42,17 @@ function harness(overrides = {}) {
     listUsers: async () => [{ id: 1, name: 'Agent One' }],
     getPerson: async (apiDomain, token, personId) => ({ id: Number(personId), name: 'Jane Roe', phones: ['+919910513597'] }),
   };
+  const intents = [];
+  const syncStore = {
+    saveC2cIntent: async (companyId, intent) => intents.push({ companyId, ...intent }),
+    ...overrides.syncStore,
+  };
   const config = { pipedrive: { jwtSecret: JWT_SECRET } };
 
   const app = express();
   app.use(express.json());
-  app.use('/api', createTelephonyRouter({ config, installStore, ivrClient, mappingStore, tokenService, pipedriveClient }));
-  return { app, c2cCalls, saved };
+  app.use('/api', createTelephonyRouter({ config, installStore, ivrClient, mappingStore, tokenService, pipedriveClient, syncStore }));
+  return { app, c2cCalls, saved, intents };
 }
 
 function listen(app) {
@@ -74,6 +79,27 @@ test('click-to-call resolves the user mapping and triggers c2c with last-10 phon
     assert.equal(body.data.recordid, 'c2c-123');
     // DID is normalized to digits (no '+') for c2c_get; phone to last-10.
     assert.deepEqual(c2cCalls[0], { did: '918044475500', extNo: '201', phone: '9910513597' });
+  } finally {
+    server.close();
+  }
+});
+
+test('click-to-call saves the dialed-from Person as a c2c intent', async () => {
+  const { app, intents } = harness({
+    ivrClient: { triggerClickToCall: async () => ({ status: 200, recordid: '750194' }) },
+  });
+  const server = await listen(app);
+  const { port } = server.address();
+  try {
+    const res = await fetch(`http://localhost:${port}/api/ivr/click-to-call`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${tokenWithUser}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: '+91 99105-13597', personId: 55 }),
+    });
+    assert.equal(res.status, 200);
+    assert.equal(intents.length, 1, 'one intent recorded');
+    assert.equal(intents[0].pbxCallId, 'c2c-750194', 'keyed by c2c-<recordid>');
+    assert.equal(intents[0].personId, 55, 'stores the dialed-from person');
   } finally {
     server.close();
   }

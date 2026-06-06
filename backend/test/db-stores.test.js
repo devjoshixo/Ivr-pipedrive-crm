@@ -140,6 +140,15 @@ if (!TEST_DB) {
     assert.equal((await syncStore.getCursors(CO)).lastCallLogId, '105');
   });
 
+  test('syncStore: c2c intent save/get/delete (person id coerced to number)', async () => {
+    await syncStore.saveC2cIntent(CO, { pbxCallId: 'c2c-9001', personId: 4242 });
+    const got = await syncStore.getC2cIntent(CO, 'c2c-9001');
+    assert.equal(got.personId, 4242);
+    assert.equal(typeof got.personId, 'number', 'BIGINT coerced to a JS number');
+    await syncStore.deleteC2cIntent(CO, 'c2c-9001');
+    assert.equal(await syncStore.getC2cIntent(CO, 'c2c-9001'), null, 'deleted');
+  });
+
   test('mappingStore: save, list, lookup by user and by extension', async () => {
     await mappingStore.saveMapping(CO, { pdUserId: '31751199', did: '+918044475500', extension: '201' });
     const list = await mappingStore.listMappings(CO);

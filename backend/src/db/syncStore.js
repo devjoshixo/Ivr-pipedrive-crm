@@ -13,6 +13,7 @@ const { tableNames } = require('./tables');
 function createSyncStore(pool, tables = tableNames()) {
   const STATE = tables.syncState;
   const CALLS = tables.syncedCalls;
+  const INTENTS = tables.c2cIntents;
 
   /** Return the three cursors for a company, creating an empty row if needed. */
   async function getCursors(companyId) {
@@ -199,6 +200,11 @@ function createSyncStore(pool, tables = tableNames()) {
        WHERE ${CALLS}.created_at < $1 AND ${STATE}.cursor_held = 0`,
       [cutoff]
     );
+    // c2c intents are normally deleted on use; sweep any stragglers (a c2c whose call
+    // never came back through the sync). They are only useful for minutes.
+    await pool.query(`DELETE FROM ${INTENTS} WHERE created_at < $1`, [
+      new Date(now - 24 * 60 * 60 * 1000),
+    ]);
     return (rows && rows.affectedRows) || 0;
   }
 
@@ -223,6 +229,39 @@ function createSyncStore(pool, tables = tableNames()) {
     };
   }
 
+  /**
+   * Click-to-call intent: remember which Person the agent dialed from, keyed by the
+   * PBX call id ('c2c-<recordid>'). The sync reads this to attach the c2c call log to
+   * that exact Person instead of re-deriving it by phone search.
+   */
+  async function saveC2cIntent(companyId, { pbxCallId, personId }) {
+    if (!pbxCallId || personId == null) return;
+    await pool.query(
+      `INSERT INTO ${INTENTS} (company_id, pbx_call_id, pd_person_id)
+       VALUES ($1, $2, $3)
+       ON DUPLICATE KEY UPDATE pd_person_id = VALUES(pd_person_id)`,
+      [companyId, pbxCallId, personId]
+    );
+  }
+
+  async function getC2cIntent(companyId, pbxCallId) {
+    if (!pbxCallId) return null;
+    const { rows } = await pool.query(
+      `SELECT pd_person_id FROM ${INTENTS} WHERE company_id = $1 AND pbx_call_id = $2`,
+      [companyId, pbxCallId]
+    );
+    const r = rows[0];
+    return r ? { personId: r.pd_person_id == null ? null : Number(r.pd_person_id) } : null;
+  }
+
+  async function deleteC2cIntent(companyId, pbxCallId) {
+    if (!pbxCallId) return;
+    await pool.query(`DELETE FROM ${INTENTS} WHERE company_id = $1 AND pbx_call_id = $2`, [
+      companyId,
+      pbxCallId,
+    ]);
+  }
+
   return {
     getCursors,
     saveCursors,
@@ -238,6 +277,9 @@ function createSyncStore(pool, tables = tableNames()) {
     getSyncState,
     setCursorHeld,
     getStats,
+    saveC2cIntent,
+    getC2cIntent,
+    deleteC2cIntent,
   };
 }
 

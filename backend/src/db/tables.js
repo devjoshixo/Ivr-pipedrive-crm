@@ -9,6 +9,7 @@ const LOGICAL = Object.freeze({
   installs: 'installs',
   syncState: 'sync_state',
   syncedCalls: 'synced_calls',
+  c2cIntents: 'c2c_intents',
   apiKeys: 'company_api_keys',
   userMappings: 'user_mappings',
 });

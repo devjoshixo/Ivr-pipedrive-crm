@@ -111,7 +111,7 @@ function buildApp(config) {
     app.use('/api/apikey', createApiKeyRouter({ config, apiKeyStore }));
     app.use(
       '/api',
-      createTelephonyRouter({ config, installStore, ivrClient, mappingStore, tokenService, pipedriveClient, apiKeyStore, limiter })
+      createTelephonyRouter({ config, installStore, ivrClient, mappingStore, tokenService, pipedriveClient, apiKeyStore, limiter, syncStore })
     );
 
     // Expose the scheduler so start() can begin the polling cadence.

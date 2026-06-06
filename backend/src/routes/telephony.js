@@ -24,6 +24,7 @@ const clickToCallSchema = z.object({
   extNo: z.string().optional(),
   extension: z.string().optional(),
   pdUserId: idLike.optional(),
+  personId: idLike.optional(), // the Person the agent dialed from (panel context)
 });
 const mappingSchema = z.object({
   pdUserId: idLike,
@@ -40,7 +41,7 @@ const mappingSchema = z.object({
  * @param {{getAccessToken: Function}} deps.tokenService
  * @param {{listUsers: Function}} deps.pipedriveClient
  */
-function createTelephonyRouter({ config, installStore, ivrClient, mappingStore, tokenService, pipedriveClient, apiKeyStore, limiter }) {
+function createTelephonyRouter({ config, installStore, ivrClient, mappingStore, tokenService, pipedriveClient, apiKeyStore, limiter, syncStore }) {
   const router = express.Router();
   const jwtSecret = config.pipedrive.jwtSecret || config.pipedrive.clientSecret;
   // Dual auth (API key / SDK token) + per-company rate limit; sets req.ivrIdentity.
@@ -85,7 +86,23 @@ function createTelephonyRouter({ config, installStore, ivrClient, mappingStore, 
       if (result && result.status && Number(result.status) !== 200) {
         return res.status(502).json(fail(result.message || 'Click-to-call was rejected'));
       }
-      return res.json(ok({ recordid: result && result.recordid }));
+      const recordid = result && result.recordid;
+      // Capture the Person the agent dialed from so the sync attaches the c2c call log
+      // to exactly that contact instead of re-deriving it by phone search. Best-effort:
+      // matches only if this recordid reappears in the click_to_call feed; else the
+      // sync falls back to the phone search.
+      if (recordid && req.body.personId != null && syncStore && syncStore.saveC2cIntent) {
+        try {
+          await syncStore.saveC2cIntent(id.companyId, {
+            pbxCallId: `c2c-${recordid}`,
+            personId: req.body.personId,
+          });
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.error('Could not save c2c intent:', e.message);
+        }
+      }
+      return res.json(ok({ recordid }));
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Click-to-call failed:', err.message);
