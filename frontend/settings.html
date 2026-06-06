@@ -88,36 +88,12 @@
       }
       .setup-body h3 { margin: 0 0 6px; font-size: 15px; }
       .setup-body p { margin: 0 0 10px; font-size: 13px; color: var(--muted); line-height: 1.5; }
-      .setup-steps { margin: 0 0 12px; padding-left: 18px; font-size: 13px; line-height: 1.7; }
-      .ext-btn {
-        display: inline-block; text-decoration: none; background: var(--brand); color: #fff;
-        font-weight: 600; font-size: 14px; padding: 9px 16px; border-radius: 8px;
-      }
-      .ext-btn:hover { opacity: 0.92; }
     </style>
   </head>
   <body>
     <div class="wrap">
       <h1>IVRSolutions for Pipedrive</h1>
-      <p class="sub">Connect your telephony account, then install the softphone extension.</p>
-
-      <div class="setup-card" id="extCard">
-        <div class="setup-step">1</div>
-        <div class="setup-body">
-          <h3>Install the IVR Solutions softphone (Chrome)</h3>
-          <p>
-            One-time setup. The softphone runs in your browser so it can place calls and
-            <strong>ring on incoming calls even when Pipedrive isn't open</strong>. Each agent
-            installs it once on their own computer.
-          </p>
-          <ol class="setup-steps">
-            <li>Click <strong>Add to Chrome</strong> and confirm the install.</li>
-            <li>The softphone window opens automatically — sign in with your IVR agent login.</li>
-            <li>Keep it open during your shift. Click any phone number to dial; incoming calls show a banner.</li>
-          </ol>
-          <a id="extLink" class="ext-btn" href="#" target="_blank" rel="noopener noreferrer">Add to Chrome</a>
-        </div>
-      </div>
+      <p class="sub">Connect your telephony account.</p>
 
       <h2 style="margin-top:0">Connect your IVR account</h2>
       <label for="token">IVR API token</label>
@@ -143,10 +119,9 @@
         <div class="setup-body">
           <h3>You're connected</h3>
           <p style="margin:0">
-            Install the extension above, then manage <strong>DID mappings, sync status, and API
-            keys</strong> from the app's <strong>Settings inside Pipedrive</strong>
-            (Tools and apps → Marketplace apps → IVRSolutions). This standalone page only handles
-            the one-time token + extension setup.
+            Manage <strong>DID mappings, sync status, and API keys</strong> from the app's
+            <strong>Settings inside Pipedrive</strong> (Tools and apps → Marketplace apps →
+            IVRSolutions). This standalone page only handles the one-time token setup.
           </p>
         </div>
       </div>
