@@ -19,7 +19,6 @@ Copy `.env.example` → `.env` and set:
 | `PIPEDRIVE_REDIRECT_URI` | `https://<DOMAIN>/oauth/callback` (must match Dev Hub exactly) |
 | `OAUTH_STATE_SECRET` | random string |
 | `IVR_BASE_URL` | `https://api.ivrsolutions.in` |
-| `CHROME_EXTENSION_URL` | Web Store URL of the IVR softphone extension (shown on the settings page). Defaults to the published listing. |
 | `SYNC_INTERVAL_MS` | `30000` (or as desired, floor 10000) |
 | `NO_MATCH_POLICY` | `floating` — log unmatched calls with no contact (default). Other values: `person`, `lead`, `skip` |
 | `RATE_LIMIT_MAX` / `RATE_LIMIT_WINDOW_MS` | `120` / `60000` |
@@ -52,18 +51,17 @@ Pipedrive requires HTTPS for OAuth + iframes. (Caddy example: `<DOMAIN> { revers
   - Custom panel (Person): `https://<DOMAIN>/panel.html`
 - Scopes: users:read, contacts:read, contacts:full, deals:read, leads:full, activities:full, phone-integration
 - After changing scopes/URLs, **reinstall** the app in the test company.
-- NOTE: the **softphone is the companion Chrome extension** (`CHROME_EXTENSION_URL`),
-  not a Pipedrive floating window — so do NOT register a floating-window extension.
-  Calls are placed/received in the extension; this app does OAuth, settings, the
-  recording panel, call logging + sync. The settings page links agents to the extension.
+- NOTE: the **softphone is the companion Chrome extension**, not a Pipedrive floating
+  window — so do NOT register a floating-window extension. Calls are placed/received in
+  the extension; this app does OAuth, settings, the recording panel, call logging + sync.
+  Agents install the extension from the Chrome Web Store.
 
 ## 5. Post-deploy smoke test
 ```bash
 curl https://<DOMAIN>/api/healthz                 # -> {"status":"ok"...}
 curl https://<DOMAIN>/settings.html -I            # -> 200
-curl https://<DOMAIN>/api/settings/client-config  # -> {"data":{"chromeExtensionUrl":"https://…"}}
 ```
-Then in Pipedrive: open Settings → install the Chrome extension → paste IVR token → Save;
+Then in Pipedrive: open Settings → paste IVR token → Save (install the Chrome extension from the Web Store);
 place a test call from the extension; confirm a call log appears in Pipedrive.
 
 ## Notes

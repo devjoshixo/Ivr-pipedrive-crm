@@ -49,12 +49,6 @@ function createSettingsRouter({ ivrClient, installStore, config }) {
     return typeof req.body?.companyId === 'string' ? req.body.companyId.trim() : '';
   }
 
-  // GET /api/settings/client-config — public, non-secret front-end config (the
-  // companion Chrome extension install URL). No auth: it's just a public URL.
-  router.get('/client-config', (req, res) => {
-    res.json(ok({ chromeExtensionUrl: (config && config.chromeExtensionUrl) || '' }));
-  });
-
   // POST /api/settings/validate-token  { token }
   router.post('/validate-token', validateBody(validateTokenSchema), async (req, res) => {
     const token = req.body.token;

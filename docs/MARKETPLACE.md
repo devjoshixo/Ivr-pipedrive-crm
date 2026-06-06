@@ -86,8 +86,7 @@ admin, or "search for all data" (persons/search works under `contacts:read`).
 1. Finish the **listing** fields (§2 + §4) and upload icon + screenshots.
 2. Set OAuth **callback URL** + scopes (§3) to your production host.
 3. Add the App extensions (**panel + settings** with production URLs). No floating window —
-   the softphone is the companion Chrome extension (link it on the settings page via
-   `CHROME_EXTENSION_URL`).
+   the softphone is the companion Chrome extension (installed from the Chrome Web Store).
 4. **Install + test** in a sandbox; record the **demo video**.
 5. Provide **test account** + **support contact** + **privacy/ToS/pricing URLs**.
 6. Click **Send to review** → respond to any reviewer feedback.
