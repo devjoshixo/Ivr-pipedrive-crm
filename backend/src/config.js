@@ -45,6 +45,13 @@ function loadConfig() {
     ivrBaseUrl: optional('IVR_BASE_URL', 'https://api.ivrsolutions.in'),
     tokenEncKey,
 
+    // Companion Chrome extension (the softphone / click-to-dial layer). Surfaced in
+    // the settings page so admins/agents can install it (one-time setup).
+    chromeExtensionUrl: optional(
+      'CHROME_EXTENSION_URL',
+      'https://chromewebstore.google.com/detail/ivr-solutions-webrtc-soft/keffpnadhppdelceioccednhjdghmbfi'
+    ),
+
     // What to do when an inbound/outbound number matches no existing Pipedrive person.
     // 'lead' = create Person + Lead (default), 'person' = create Person, 'skip' = don't log.
     noMatchPolicy: optional('NO_MATCH_POLICY', 'lead'),

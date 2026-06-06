@@ -274,6 +274,24 @@ async function runSync() {
   }
 }
 
+// ---------- Companion Chrome extension install card ----------
+async function loadExtensionCard() {
+  const card = document.getElementById('extCard');
+  const link = document.getElementById('extLink');
+  try {
+    const res = await fetch(BACKEND_BASE + '/api/settings/client-config');
+    const body = await res.json();
+    const url = body && body.data && body.data.chromeExtensionUrl;
+    if (url && link) {
+      link.href = url;
+    } else if (card) {
+      card.style.display = 'none'; // no URL configured — hide the prompt
+    }
+  } catch {
+    if (card) card.style.display = 'none';
+  }
+}
+
 // ---------- Server-to-server API key ----------
 async function loadApiKey() {
   try {
@@ -325,6 +343,7 @@ async function init() {
   const genBtn = document.getElementById('genKeyBtn');
   if (runBtn) runBtn.addEventListener('click', runSync);
   if (genBtn) genBtn.addEventListener('click', regenerateKey);
+  loadExtensionCard();
   loadMappings();
   loadStatus();
   loadApiKey();

@@ -71,19 +71,6 @@ async function callViaC2C(phone, statusEl) {
   }
 }
 
-// Softphone WebRTC dial: surface the floating window so the agent can dial there.
-// (The native phone-field click also imports the number into the softphone.)
-async function dialInSoftphone() {
-  try {
-    if (sdk && sdk.execute) {
-      // TODO(verify in-product): pass the number as floating-window context if supported.
-      await sdk.execute('show_floating_window');
-    }
-  } catch {
-    /* non-fatal */
-  }
-}
-
 function renderCallButtons(person) {
   const root = document.getElementById('callbar');
   root.innerHTML = '';
@@ -101,17 +88,11 @@ function renderCallButtons(person) {
     const call = document.createElement('button');
     call.textContent = 'Call';
     call.title = 'Rings your softphone + cell, then the customer';
-    const soft = document.createElement('button');
-    soft.className = 'secondary';
-    soft.textContent = 'Softphone';
-    soft.title = 'Dial in the browser softphone';
     const status = document.createElement('span');
     status.className = 'callstatus';
     call.addEventListener('click', () => callViaC2C(phone, status));
-    soft.addEventListener('click', dialInSoftphone);
     row.appendChild(num);
     row.appendChild(call);
-    row.appendChild(soft);
     row.appendChild(status);
     root.appendChild(row);
   });

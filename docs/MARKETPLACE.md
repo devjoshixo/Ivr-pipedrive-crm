@@ -63,27 +63,31 @@ admin, or "search for all data" (persons/search works under `contacts:read`).
 > Embed the IVRSolutions softphone in Pipedrive — click-to-dial, screen-pop, and automatic call logging.
 
 **Full description:**
-> IVRSolutions brings your cloud telephony into Pipedrive. Agents take and place calls from an
-> embedded softphone without leaving the CRM, every call is logged automatically against the
-> right contact, and call recordings are one click away.
+> IVRSolutions brings your cloud telephony into Pipedrive. Agents place and receive calls with the
+> IVRSolutions softphone (a free companion Chrome extension), every call is logged automatically
+> against the right contact, and call recordings are one click away.
 >
 > **Features**
-> - **Embedded softphone** — log in and handle calls inside Pipedrive (floating window).
-> - **Click-to-dial** — call any phone number on a contact or lead in one click.
-> - **Inbound screen-pop** — the matching contact opens automatically on an incoming call.
+> - **Browser softphone** — place and receive calls via the IVRSolutions Chrome extension; it stays
+>   registered in the background so inbound calls ring even when Pipedrive isn't open.
+> - **Click-to-dial** — click any phone number on any page to dial.
+> - **Inbound alert** — an incoming-call banner shows on every tab the moment a call arrives.
 > - **Automatic call logging** — every call becomes a Pipedrive call activity with duration,
 >   direction, and a recording link, linked to the right person.
 > - **Unknown callers → Leads** — new numbers are captured as Leads for triage.
 > - **Call recordings** — listen to recordings right on the contact's page.
-> - **Background sync** — a continuous sync backfills any calls handled outside the browser.
+> - **Background sync** — a continuous sync logs every call, handled in any browser or device.
 >
-> Requires an active IVRSolutions account.
+> Requires an active IVRSolutions account and the free **IVRSolutions Webrtc Softphone** Chrome
+> extension (one-time install, linked from the app's settings page).
 
 ## 5. Submission flow (Developer Hub)
 
 1. Finish the **listing** fields (§2 + §4) and upload icon + screenshots.
 2. Set OAuth **callback URL** + scopes (§3) to your production host.
-3. Add the App extensions (floating window, panel, settings) with production URLs.
+3. Add the App extensions (**panel + settings** with production URLs). No floating window —
+   the softphone is the companion Chrome extension (link it on the settings page via
+   `CHROME_EXTENSION_URL`).
 4. **Install + test** in a sandbox; record the **demo video**.
 5. Provide **test account** + **support contact** + **privacy/ToS/pricing URLs**.
 6. Click **Send to review** → respond to any reviewer feedback.

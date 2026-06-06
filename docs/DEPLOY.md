@@ -19,6 +19,7 @@ Copy `.env.example` → `.env` and set:
 | `PIPEDRIVE_REDIRECT_URI` | `https://<DOMAIN>/oauth/callback` (must match Dev Hub exactly) |
 | `OAUTH_STATE_SECRET` | random string |
 | `IVR_BASE_URL` | `https://api.ivrsolutions.in` |
+| `CHROME_EXTENSION_URL` | Web Store URL of the IVR softphone extension (shown on the settings page). Defaults to the published listing. |
 | `SYNC_INTERVAL_MS` | `30000` (or as desired, floor 10000) |
 | `NO_MATCH_POLICY` | `lead` |
 | `RATE_LIMIT_MAX` / `RATE_LIMIT_WINDOW_MS` | `120` / `60000` |
@@ -47,19 +48,23 @@ Pipedrive requires HTTPS for OAuth + iframes. (Caddy example: `<DOMAIN> { revers
 ## 4. Update the Pipedrive Developer Hub (point everything at <DOMAIN>)
 - **OAuth callback URL:** `https://<DOMAIN>/oauth/callback`  (and the uninstall DELETE hits the same URL)
 - **App extensions → URLs:**
-  - Floating window (softphone): `https://<DOMAIN>/softphone-host.html`
-  - App settings page:          `https://<DOMAIN>/settings.html`
-  - Custom panel (Person):      `https://<DOMAIN>/panel.html`
+  - App settings page:    `https://<DOMAIN>/settings.html`
+  - Custom panel (Person): `https://<DOMAIN>/panel.html`
 - Scopes: users:read, contacts:read, contacts:full, deals:read, leads:full, activities:full, phone-integration
 - After changing scopes/URLs, **reinstall** the app in the test company.
+- NOTE: the **softphone is the companion Chrome extension** (`CHROME_EXTENSION_URL`),
+  not a Pipedrive floating window — so do NOT register a floating-window extension.
+  Calls are placed/received in the extension; this app does OAuth, settings, the
+  recording panel, call logging + sync. The settings page links agents to the extension.
 
 ## 5. Post-deploy smoke test
 ```bash
 curl https://<DOMAIN>/api/healthz                 # -> {"status":"ok"...}
 curl https://<DOMAIN>/settings.html -I            # -> 200
+curl https://<DOMAIN>/api/settings/client-config  # -> {"data":{"chromeExtensionUrl":"https://…"}}
 ```
-Then in Pipedrive: open Settings → paste IVR token → Save; open the softphone; place a
-test call; confirm a call log appears.
+Then in Pipedrive: open Settings → install the Chrome extension → paste IVR token → Save;
+place a test call from the extension; confirm a call log appears in Pipedrive.
 
 ## Notes
 - The schema targets **MariaDB 10.6+ / MySQL 8+**. Works on shared hosting MySQL

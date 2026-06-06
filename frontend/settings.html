@@ -76,13 +76,50 @@
         border-radius: 50%; animation: spin 0.7s linear infinite;
       }
       @keyframes spin { to { transform: rotate(360deg); } }
+      .setup-card {
+        display: flex; gap: 14px; align-items: flex-start;
+        border: 1px solid var(--border); border-left: 4px solid var(--brand);
+        border-radius: 10px; padding: 16px; margin: 0 0 26px; background: #f7fafd;
+      }
+      .setup-step {
+        flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%;
+        background: var(--brand); color: #fff; font-weight: 700; font-size: 14px;
+        display: flex; align-items: center; justify-content: center;
+      }
+      .setup-body h3 { margin: 0 0 6px; font-size: 15px; }
+      .setup-body p { margin: 0 0 10px; font-size: 13px; color: var(--muted); line-height: 1.5; }
+      .setup-steps { margin: 0 0 12px; padding-left: 18px; font-size: 13px; line-height: 1.7; }
+      .ext-btn {
+        display: inline-block; text-decoration: none; background: var(--brand); color: #fff;
+        font-weight: 600; font-size: 14px; padding: 9px 16px; border-radius: 8px;
+      }
+      .ext-btn:hover { opacity: 0.92; }
     </style>
   </head>
   <body>
     <div class="wrap">
       <h1>IVRSolutions for Pipedrive</h1>
-      <p class="sub">Paste your IVR API token to connect your telephony account.</p>
+      <p class="sub">Connect your telephony account, then install the softphone extension.</p>
 
+      <div class="setup-card" id="extCard">
+        <div class="setup-step">1</div>
+        <div class="setup-body">
+          <h3>Install the IVR Solutions softphone (Chrome)</h3>
+          <p>
+            One-time setup. The softphone runs in your browser so it can place calls and
+            <strong>ring on incoming calls even when Pipedrive isn't open</strong>. Each agent
+            installs it once on their own computer.
+          </p>
+          <ol class="setup-steps">
+            <li>Click <strong>Add to Chrome</strong> and confirm the install.</li>
+            <li>The softphone window opens automatically — sign in with your IVR agent login.</li>
+            <li>Keep it open during your shift. Click any phone number to dial; incoming calls show a banner.</li>
+          </ol>
+          <a id="extLink" class="ext-btn" href="#" target="_blank" rel="noopener noreferrer">Add to Chrome</a>
+        </div>
+      </div>
+
+      <h2 style="margin-top:0">Connect your IVR account</h2>
       <label for="token">IVR API token</label>
       <div class="row">
         <input id="token" type="text" autocomplete="off" spellcheck="false"
