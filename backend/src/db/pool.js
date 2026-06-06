@@ -50,6 +50,19 @@ function getPool(databaseUrl) {
     multipleStatements: false, // migrate splits statements itself; keep this off
     dateStrings: false, // DATETIME -> JS Date (parity with pg)
   });
+
+  // The client reads/writes DATETIME as UTC (timezone:'Z' above). Force each pooled
+  // connection's SESSION time zone to UTC as well, so server-side NOW()/CURRENT_TIMESTAMP
+  // values are generated in UTC and stay consistent with the client. Without this, a DB
+  // whose session zone is non-UTC (the shared MariaDB runs +05:30) offsets every
+  // now()-written timestamp (created_at, updated_at, last_sync_at) by that amount.
+  const base = raw.pool || raw;
+  if (base && typeof base.on === 'function') {
+    base.on('connection', (conn) => {
+      conn.query("SET time_zone = '+00:00'");
+    });
+  }
+
   pool = { query: makeQuery(raw), end: () => raw.end(), _raw: raw };
   return pool;
 }
